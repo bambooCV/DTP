@@ -20,6 +20,18 @@ import matplotlib.pyplot as plt
 from traj_predict.traj_func import Real_Robot_2D_PreProcess,resize_points
 import cv2
 from torchvision.transforms.v2 import Resize
+
+
+# 定义颜色范围（浅色和深色，BGR 格式）
+color_start = np.array([13, 0, 103])      # 深色 (BGR: 103, 0, 13)
+color_end = np.array([240, 245, 255])  # 浅色 (BGR: 255, 245, 240)
+
+def interpolate_color(index, total_points, color_start, color_end):
+    """根据 index 插值颜色，从浅到深渐变"""
+    ratio = index / total_points  # 当前点的比例
+    color = color_start + (color_end - color_start) * ratio
+    return tuple(map(int, color))  # 转换为 Python 原生整数元组
+
 def unnormalize_data(ndata, stats={'min': 0,'max': 224}):
     ndata = (ndata + 1) / 2 # [-1, 1] -> [0, 1] 域
     data = ndata * (stats['max'] - stats['min']) + stats['min']
@@ -33,10 +45,11 @@ class TrajPredictPolicy(nn.Module):
 
         # vision encoders model
         model_mae = vits.__dict__['vit_base'](patch_size=16, num_classes=0)
-        checkpoint_vit = torch.load("../Pretrain_Model/vit/mae_pretrain_vit_base.pth")
+        checkpoint_vit = torch.load("/media/users/bamboo/PretrainModel/vit/mae_pretrain_vit_base.pth")
         model_mae.load_state_dict(checkpoint_vit['model'], strict=False)
         # language encoders model
-        model_clip, _ = clip.load("ViT-B/32",device="cpu") 
+        model_clip, _ = clip.load("/media/users/bamboo/PretrainModel/clip/ViT-B-32.pt",device="cpu") 
+       
         # CLIP for language encoding
         self.model_clip = model_clip
         for _, param in self.model_clip.named_parameters():
@@ -106,7 +119,8 @@ rgb_std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = TrajPredictPolicy()
 # 预训练模型读入
-model_path = "Save/Real_Robot_2D_pick_bread_total.pth"
+# model_path = "Save/Real_Robot_2D_evaluation_0114.pth"
+model_path = "Save/Real_Robot_2D_evaluation_hflip.pth"
 state_dict = torch.load(model_path,map_location=device)['model_state_dict']
 new_state_dict = {}
 for key, value in state_dict.items():
@@ -135,12 +149,17 @@ noise_scheduler = DDPMScheduler(
 
 with torch.no_grad():
     model.eval()
-    language = "pick up the bread and put it on the plate"
+    # language = "put the yellow pepper and place it into bowl"
+    # language = "put the red pepper and place it into bowl"
+    # language = "put the yellow pepper and place it into basket"
+    # language = "put the red pepper and place it into basket"
+    language = "grasp brown steamed buns in the pan"
+    # language = "close the pot"
     tokenizer = clip.tokenize
     tokenized_text = tokenizer(language).to(device)
     # image = cv2.imread("/home/bamboofan/EmbodiedAI/multiview_dataaug/Grounded-Segment-Anything/A_visualization/pick_bread_ori.jpg")
     # image = cv2.imread("/home/bamboofan/EmbodiedAI/multiview_dataaug/Grounded-Segment-Anything/A_visualization/remove/pick_bread_aug_280_234.jpg")
-    image = cv2.imread("/home/bamboofan/EmbodiedAI/diffusion-trajectory-guided-policy/traj_predict/script/visualization/rgb/camera_top_0.jpg")
+    image = cv2.imread("/media/users/bamboo/EmbodiedAI/DTP/tools/visualization/h5_vis.png")
     image = cv2.resize(image, dsize=(640,480))
     # image 转 tensor
     image_tensor = torch.from_numpy(image.transpose(2, 0, 1)).float()
@@ -192,5 +211,18 @@ with torch.no_grad():
         cv2.circle(rgb_vis, tuple(point_2d.int().tolist()), radius=6, color=color, thickness=-1)
         # cv2.circle(rgb_camera_top, tuple(point_2d.int().tolist()), radius=3, color=(0, 0, 255), thickness=-1)
     
-    cv2.imwrite(f"traj_predict/script/visualization/image_inference.png", rgb_vis)  
+    cv2.imwrite(f"tools/visualization/diffusion_inference.png", rgb_vis)  
+    rgb_vis = image_tensor.permute(1, 2, 0).numpy().copy()
+    # 绘制点
+    for index, point_2d in enumerate(re_out_action_ori):
+        # 获取渐变颜色
+        color = interpolate_color(index, len(re_out_action_ori) - 1, color_start, color_end)
+        
+        # 绘制外圈白色圆圈
+        cv2.circle(rgb_vis, tuple(point_2d.int().tolist()), radius=8, color=(255, 255, 255), thickness=-1)
+        
+        # 绘制内圈渐变色圆圈
+        cv2.circle(rgb_vis, tuple(point_2d.int().tolist()), radius=6, color=color, thickness=-1)
 
+    # 保存图像
+    cv2.imwrite("tools/visualization/diffusion_inference_gradient.png", rgb_vis)

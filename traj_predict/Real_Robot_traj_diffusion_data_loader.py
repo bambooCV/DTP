@@ -199,15 +199,37 @@ class LMDBDataset(Dataset):
                 else: 
                     traj_2d_top_trans = traj_2d_top * torch.tensor([0.5, 0.667])  + torch.tensor([0, 80]) # 坐标转换
                     top_actions[i,:,:] = resample_sequence_adapter(traj_2d_top_trans, self.chunk_size) # 坐标下采样
+                    rand_value = random.random()
+                    if rand_value < 0.5:
+                        # 随机亮度、对比度、饱和度调整
+                        # enhancer = transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2)
+                        # rgb_camera_top[i] = enhancer(rgb_camera_top[i])
+                        pass
+                    else:
+                        rgb_camera_top[i] = transforms.functional.hflip(rgb_camera_top[i])
+                        top_actions[i][:, 0] = rgb_camera_top[i].shape[-1] - top_actions[i][:, 0]
+                    # elif rand_value < 0.5:
+                    #     # 水平翻转
+                    #     rgb_camera_top[i] = transforms.functional.hflip(rgb_camera_top[i])
+                    #     top_actions[i][:, 0] = rgb_camera_top[i].shape[-1] - top_actions[i][:, 0]
+                    # elif rand_value < 0.75:
+                    #     # 垂直翻转
+                    #     rgb_camera_top[i] = transforms.functional.vflip(rgb_camera_top[i])
+                    #     top_actions[i][:, 1] = rgb_camera_top[i].shape[-2] - top_actions[i][:, 1]
+                    # else:
+                    #     # 同时水平和垂直翻转
+                    #     rgb_camera_top[i] = transforms.functional.hflip(rgb_camera_top[i])
+                    #     rgb_camera_top[i] = transforms.functional.vflip(rgb_camera_top[i])
+                    #     top_actions[i][:, 0] = rgb_camera_top[i].shape[-1] - top_actions[i][:, 0]
+                    #     top_actions[i][:, 1] = rgb_camera_top[i].shape[-2] - top_actions[i][:, 1]
                     # vis
                     # rgb_vis = rgb_camera_top[i].permute(1, 2, 0).numpy().copy()
                     # for (u, v) in top_actions[i]:
                     #     cv2.circle(rgb_vis, (int(u), int(v)), radius=5, color=(0, 255, 0), thickness=-1) 
-
-                    # cv2.imwrite("traj_predict/script/visualization/rgb_vis.png", rgb_vis)  
+                    # cv2.imwrite("tools/visualization/train_rgb_vis.png", rgb_vis)  
+                    # print(inst)
                     # print('test')
 
-                
         return {
             'rgb_camera_top': rgb_camera_top,
             'inst':inst,
@@ -223,10 +245,10 @@ class LMDBDataset(Dataset):
 if __name__ == '__main__':
     from traj_func import Real_Robot_2D_PreProcess
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    batch_size = 96
+    batch_size = 32
     num_workers = 1
     preprocessor = Real_Robot_2D_PreProcess(
-        rgb_static_pad = 10, # 去除位置敏感性
+        rgb_static_pad = 30, # 去除位置敏感性
         rgb_shape = [224,224], 
         rgb_mean = [0.485, 0.456, 0.406],
         rgb_std =  [0.229, 0.224, 0.225],
@@ -234,20 +256,20 @@ if __name__ == '__main__':
     )
 
     train_dataset = LMDBDataset(
-        lmdb_dir = "/bamboo_dir/pick_bread_plate/success_episodes_lmdb/",
+        lmdb_dir = "/media/users/bamboo/dataset/lmdb/evaluation_1/",
         sequence_length = 1, 
         chunk_size = 30,# 最长不超过65
         action_dim = 2, # x,y,gripper_state
         start_ratio = 0,
-        end_ratio = 0.28, 
+        end_ratio = 0.95, 
     )
     val_dataset = LMDBDataset(
-        lmdb_dir = "/bamboo_dir/pick_bread_plate/success_episodes_lmdb/",
+        lmdb_dir = "/media/users/bamboo/dataset/lmdb/evaluation_1/",
         sequence_length = 1, 
         chunk_size = 30,# 最长不超过65
         action_dim = 2,
-        start_ratio = 0.28,
-        end_ratio = 0.3, 
+        start_ratio = 0.95,
+        end_ratio = 1, 
     )
     train_loader = DataLoader(
         train_dataset, 
@@ -288,14 +310,14 @@ if __name__ == '__main__':
                         for point_2d in naction[batch_idx,seq_idx,:,:]:
                             cv2.circle(rgb_camera_top, tuple(point_2d.int().tolist()), radius=3, color=(0, 0, 255), thickness=-1)
                         cv2.putText(rgb_camera_top, batch["inst"][batch_idx], (10, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.30, (0, 0, 0), 1)
-                        cv2.imwrite("traj_predict/script/visualization/rgb_camera_top_groundtruth.png", rgb_camera_top)  
+                        cv2.imwrite("tools/visualization/rgb_camera_top_groundtruth.png", rgb_camera_top)  
 
                         rgb_top_reshape = preprocessor.rgb_recovery(rgb_top_norm)
                         rgb_top_np = rgb_top_reshape[batch_idx][seq_idx].permute(1, 2, 0).cpu().numpy().copy()
 
                         for point_2d in naction_transformed[batch_idx,seq_idx,:,:]:
                             cv2.circle(rgb_top_np, tuple(point_2d.int().tolist()), radius=3, color=(0, 0, 255), thickness=-1)
-                        cv2.imwrite("traj_predict/script/visualization/rgb_camera_top_trans.png", rgb_top_np)  
+                        cv2.imwrite("tools/visualization/rgb_camera_top_trans.png", rgb_top_np)  
                         cv2.waitKey(10)
                 pbar.update(1) 
 

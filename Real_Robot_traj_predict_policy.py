@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
 # os.environ['CUDA_VISIBLE_DEVICES'] = '2,3,4,5'
 # os.environ['CUDA_VISIBLE_DEVICES'] = '2,3,4,5,6,7'
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
@@ -44,7 +44,7 @@ def contains_words(inst, include_words=[], exclude_words=[]):
             return False
     return True
 def save_checkpoint(epoch, model, optimizer,  loss,save_dir="./Save"):
-    save_path = os.path.join(save_dir, f'Real_Robot_2D_pick_bread_total.pth')
+    save_path = os.path.join(save_dir, f'Real_Robot_2D_evaluation_hflip.pth')
     
     # 要排除的模块列表
     modules_to_exclude = ['model_mae', 'model_clip']
@@ -89,10 +89,10 @@ class TrajPredictPolicy(nn.Module):
 
         # vision encoders model
         model_mae = vits.__dict__['vit_base'](patch_size=16, num_classes=0)
-        checkpoint_vit = torch.load("../Pretrain_Model/vit/mae_pretrain_vit_base.pth")
+        checkpoint_vit = torch.load("/media/users/bamboo/PretrainModel/vit/mae_pretrain_vit_base.pth")
         model_mae.load_state_dict(checkpoint_vit['model'], strict=False)
         # language encoders model
-        model_clip, _ = clip.load("ViT-B/32",device="cpu") 
+        model_clip, _ = clip.load("/media/users/bamboo/PretrainModel/clip/ViT-B-32.pt",device="cpu") 
         # CLIP for language encoding
         self.model_clip = model_clip
         for _, param in self.model_clip.named_parameters():
@@ -158,16 +158,16 @@ if __name__ == '__main__':
     acc = Accelerator(
         kwargs_handlers=[ddp_kwargs]
     )
-    wandb_model = True
+    wandb_model = False
     if wandb_model and acc.is_main_process:
-        wandb.init(project='Real Robot 2D Trajectory generation', group='24101516_pick_bread_plate_1', name='20241128')
+        wandb.init(project='Real Robot 2D Trajectory generation', group='evaluation', name='20250114')
     device = acc.device
     # config prepare
     epoch_num = 100
-    batch_size_train = 96
+    batch_size_train = 16
     batch_size_val = 64
     num_workers = 4
-    lmdb_dir = "/bamboo_dir/pick_bread_plate/success_episodes_lmdb_1/"
+    lmdb_dir = "/media/users/bamboo/dataset/lmdb/evaluation_1/"
     #image preprocess
     preprocessor = Real_Robot_2D_PreProcess(
         rgb_static_pad = 20, # 去除位置敏感性
