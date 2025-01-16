@@ -70,7 +70,8 @@ def train(acc, train_prefetcher, test_prefetcher, preprocessor, model, env, eva,
             'rgb_camera_top': 0,
             'action_arm': 0,
             'action_gripper': 0,
-            **({'traj_2d_preds': 0} if cfg['use_2d_traj'] else {})
+            **({'traj_2d_preds': 0} if cfg['use_2d_traj'] else {}),
+            'total_loss': 0
         }
         eval_log_loss = {
             'rgb_camera_left': 0,
@@ -78,7 +79,8 @@ def train(acc, train_prefetcher, test_prefetcher, preprocessor, model, env, eva,
             'rgb_camera_top': 0,
             'action_arm': 0,
             'action_gripper': 0,
-            **({'traj_2d_preds': 0} if cfg['use_2d_traj'] else {}) 
+            **({'traj_2d_preds': 0} if cfg['use_2d_traj'] else {}),
+            'total_loss':0
         }
         for key in log_loss:
             log_loss[key] = torch.tensor(0).float().to(device)
@@ -125,9 +127,10 @@ def train(acc, train_prefetcher, test_prefetcher, preprocessor, model, env, eva,
                     loss['action_arm'] = masked_loss(pred['arm_action_preds'], batch['actions'][..., :7], batch['mask'], 0, F.smooth_l1_loss)
                     loss['action_gripper'] = masked_loss(pred['gripper_action_preds'], batch['actions'][..., -1:], batch['mask'], 0, F.binary_cross_entropy_with_logits)
 
-                    total_loss =  (loss['traj_2d_preds'] if cfg['use_2d_traj'] else 0)\
-                                 + cfg['use_2d_traj']  + loss['rgb_camera_left'] + loss['rgb_camera_right'] +  loss['rgb_camera_top'] + cfg['arm_loss_ratio']*loss['action_arm'] + loss['action_gripper'] 
-                    acc.backward(total_loss)
+                    loss['total_loss'] = (loss['traj_2d_preds'] if cfg['use_2d_traj'] else 0) \
+                                   + loss['rgb_camera_left'] + loss['rgb_camera_right'] + loss['rgb_camera_top'] \
+                                   + cfg['arm_loss_ratio']*loss['action_arm'] + loss['action_gripper'] 
+                    acc.backward(loss['total_loss'])
                     optimizer.step(optimizer)
                     for key in log_loss:
                         log_loss[key] += loss[key].detach() / cfg['print_steps']
@@ -162,7 +165,9 @@ def train(acc, train_prefetcher, test_prefetcher, preprocessor, model, env, eva,
 
                         loss['action_arm'] = masked_loss(pred['arm_action_preds'], batch['actions'][..., :7], batch['mask'], 0, F.smooth_l1_loss)
                         loss['action_gripper'] = masked_loss(pred['gripper_action_preds'], batch['actions'][..., -1:], batch['mask'], 0, F.binary_cross_entropy_with_logits)
-
+                        loss['total_loss'] = (loss['traj_2d_preds'] if cfg['use_2d_traj'] else 0) \
+                                    + loss['rgb_camera_left'] + loss['rgb_camera_right'] + loss['rgb_camera_top'] \
+                                    + cfg['arm_loss_ratio']*loss['action_arm'] + loss['action_gripper'] 
                         for key in eval_log_loss:
                             eval_log_loss[key] += loss[key].detach() / cfg['print_steps'] * eval_steps
             	# print steps log

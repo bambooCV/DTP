@@ -196,19 +196,20 @@ class DTP_Evaluation():
                 self.policy_traj.load_state_dict(traj_state_dict,strict=False)
             self.policy_traj = self.policy_traj.to(self.device)
 
-        self.num_diffusion_iters = 100
-        self.noise_scheduler = DDPMScheduler(
-            num_train_timesteps=self.num_diffusion_iters,
-            # the choise of beta schedule has big impact on performance
-            # we found squared cosine works the best
-            beta_schedule='squaredcos_cap_v2',
-            # clip output to [-1,1] to improve stability
-            clip_sample=True,
-            # our network predicts noise (instead of denoised action)
-            prediction_type='epsilon'
-        )
+            self.num_diffusion_iters = 100
+            self.noise_scheduler = DDPMScheduler(
+                num_train_timesteps=self.num_diffusion_iters,
+                # the choise of beta schedule has big impact on performance
+                # we found squared cosine works the best
+                beta_schedule='squaredcos_cap_v2',
+                # clip output to [-1,1] to improve stability
+                clip_sample=True,
+                # our network predicts noise (instead of denoised action)
+                prediction_type='epsilon'
+            )
 
         # ensembling
+        # self.temporal_ensembling = False
         self.temporal_ensembling = True
         self.max_publish_step = 10000
         self.step = 0
@@ -226,9 +227,13 @@ class DTP_Evaluation():
         self.step = 0
         self.all_time_actions = torch.zeros([self.max_publish_step, self.max_publish_step + self.chunk_size, self.state_dim]).to(self.device)
 
-    def inference(self,obs):
+    def inference(self,obs,text = " "):
+
         # Language
-        text = "pick up the bread and put it on the plate"
+        # text = "put the red pepper and place it into bowl"
+        text = text
+        # text = "open the pot"
+        # text = "grasp brown steame buns in the pan"
         tokenized_text = self.tokenizer(text)
 
         # get images
@@ -384,34 +389,36 @@ class DTP_Evaluation():
         )
         # rgb show
         # visualization image
-        # p = 16
-        # h_p = 14
-        # w_p = 14
-        # rgb_vis= rgb_right_data.reshape(shape=(rgb_right_data.shape[0], rgb_right_data.shape[1], 3, h_p, p, w_p, p)) 
-        # rgb_vis = rgb_vis.permute(0, 1, 3, 5, 4, 6, 2)
-        # rgb_vis = rgb_vis.reshape(shape=(rgb_vis.shape[0], rgb_vis.shape[1], h_p * w_p, (p**2) * 3))  # (b, t, n_patches, p*p*3)
-        # mean = rgb_vis.mean(dim=-1, keepdim=True)
-        # std = rgb_vis.var(dim=-1, unbiased=True, keepdim=True).sqrt() + 1e-6
+        p = 16
+        h_p = 14
+        w_p = 14
+        rgb_vis= rgb_top_data.reshape(shape=(rgb_top_data.shape[0], rgb_top_data.shape[1], 3, h_p, p, w_p, p)) 
+        rgb_vis = rgb_vis.permute(0, 1, 3, 5, 4, 6, 2)
+        rgb_vis = rgb_vis.reshape(shape=(rgb_vis.shape[0], rgb_vis.shape[1], h_p * w_p, (p**2) * 3))  # (b, t, n_patches, p*p*3)
+        mean = rgb_vis.mean(dim=-1, keepdim=True)
+        std = rgb_vis.var(dim=-1, unbiased=True, keepdim=True).sqrt() + 1e-6
         
 
-        # obs_targets = prediction["obs_right_targets"]
-        # obs_targets = obs_targets * std + mean
-        # obs_targets = obs_targets.reshape(rgb_vis.shape[0], rgb_vis.shape[1], h_p, w_p, p, p, 3)
-        # obs_targets = obs_targets.permute(0, 1, 6, 2, 4, 3, 5)
-        # obs_targets = obs_targets.reshape(rgb_vis.shape[0], rgb_vis.shape[1], 3, h_p * p, w_p * p)
-        # obs_targets = self.preprocessor.rgb_recovery(obs_targets)
+        obs_targets = prediction["obs_top_targets"]
+        obs_targets = obs_targets * std + mean
+        obs_targets = obs_targets.reshape(rgb_vis.shape[0], rgb_vis.shape[1], h_p, w_p, p, p, 3)
+        obs_targets = obs_targets.permute(0, 1, 6, 2, 4, 3, 5)
+        obs_targets = obs_targets.reshape(rgb_vis.shape[0], rgb_vis.shape[1], 3, h_p * p, w_p * p)
+        obs_targets = self.preprocessor.rgb_recovery(obs_targets)
         
 
-        # obs_preds = prediction["obs_right_preds"]
-        # obs_preds = obs_preds * std + mean
-        # obs_preds = obs_preds.reshape(rgb_vis.shape[0], rgb_vis.shape[1], h_p, w_p, p, p, 3)
-        # obs_preds = obs_preds.permute(0, 1, 6, 2, 4, 3, 5)
-        # obs_preds = obs_preds.reshape(rgb_vis.shape[0], rgb_vis.shape[1], 3, h_p * p, w_p * p)
-        # obs_preds = self.preprocessor.rgb_recovery(obs_preds)
-        # for batch_idx in range(obs_targets.shape[0]):
-        #     seq_idx = len(self.rgb_left_list)-1
-        #     obs_targets_ori = obs_targets[batch_idx][seq_idx].permute(1, 2, 0).cpu().numpy()
-        #     obs_targets_pred = obs_preds[batch_idx][seq_idx].permute(1, 2, 0).cpu().numpy()
+        obs_preds = prediction["obs_top_preds"]
+        obs_preds = obs_preds * std + mean
+        obs_preds = obs_preds.reshape(rgb_vis.shape[0], rgb_vis.shape[1], h_p, w_p, p, p, 3)
+        obs_preds = obs_preds.permute(0, 1, 6, 2, 4, 3, 5)
+        obs_preds = obs_preds.reshape(rgb_vis.shape[0], rgb_vis.shape[1], 3, h_p * p, w_p * p)
+        obs_preds = self.preprocessor.rgb_recovery(obs_preds)
+        for batch_idx in range(obs_targets.shape[0]):
+            seq_idx = len(self.rgb_left_list)-1
+            obs_targets_ori = obs_targets[batch_idx][seq_idx].permute(1, 2, 0).cpu().numpy()
+            obs_targets_pred = obs_preds[batch_idx][seq_idx].permute(1, 2, 0).cpu().numpy()
+            # cv2.imshow("obs_targets_ori", obs_targets_ori)
+            # cv2.imshow("obs_targets_pred", obs_targets_pred)
             # cv2.imwrite("/home/ps/Dev/bamboo/inrocs_online_inference/run/visualization/obs_targets_ori.png",obs_targets_ori)
             # cv2.imwrite("/home/ps/Dev/bamboo/inrocs_online_inference/run/visualization/obs_targets_pred.png",obs_targets_pred)
 
@@ -435,11 +442,12 @@ class DTP_Evaluation():
             # ensembling
             if self.temporal_ensembling and self.step < self.max_publish_step:
                 all_actions = torch.cat((arm_action_preds, gripper_action_preds), dim=-1)  # (all_chunk_size,act_dim,) 当前所有的预测action
-                self.all_time_actions[[self.step], self.step:self.step + self.chunk_size] = all_actions[-1]
+                self.all_time_actions[[self.step], self.step:self.step + self.chunk_size] = all_actions[-1][:self.chunk_size]
                 actions_for_curr_step = self.all_time_actions[:, self.step]
                 actions_populated = torch.any(actions_for_curr_step != 0, dim=1)
                 actions_for_curr_step = actions_for_curr_step[actions_populated]
                 k = 0.01
+
                 exp_weights = torch.exp(-k * torch.arange(len(actions_for_curr_step), dtype=torch.float32)).to(self.device)
                 exp_weights = exp_weights / exp_weights.sum()
                 exp_weights = exp_weights.unsqueeze(1)  # 增加维度以进行广播
@@ -511,11 +519,11 @@ class DTP_Evaluation():
             # 检测按键输入
             key = cv2.waitKey(1) & 0xFF  # 等待键盘输入
 
-            if key == ord('r'):  # 如果按下 'K'
+            if key == ord('d'):  # 如果按下 'd'
                 self.diff_flag = True
-                print("Key 'r' pressed, diff_flag set to:", self.diff_flag)
+                print("Key 'd' pressed, diff_flag set to:", self.diff_flag)
         cv2.imshow("image_inference", rgb_vis)
-        cv2.waitKey(1)
+        # cv2.waitKey(1)
 
         return action_pred
 def main_DTP():
@@ -539,17 +547,23 @@ def main_DTP():
 
     frame_num = 0
     while True:
-        image_left_path = f'traj_predict/script/visualization/rgb/camera_left_{frame_num}.jpg'
-        fake_left_image = cv2.imread(image_left_path)
+        # image_left_path = f'traj_predict/script/visualization/rgb/camera_left_{frame_num}.jpg'
+        # fake_left_image = cv2.imread(image_left_path)
+        # _, fake_left_image = cv2.imencode('.jpg', fake_left_image)
+        # image_right_path = f'traj_predict/script/visualization/rgb/camera_right_{frame_num}.jpg'
+        # fake_right_image = cv2.imread(image_right_path)
+        # _, fake_right_image = cv2.imencode('.jpg', fake_right_image)
+        # image_top_path = f'traj_predict/script/visualization/rgb/camera_top_{frame_num}.jpg'
+        # fake_top_image = cv2.imread(image_top_path)
+        # _, fake_top_image = cv2.imencode('.jpg', fake_top_image)
+
+        # fake
+        fake_left_image = np.random.randint(0, 256, (480, 640, 3), dtype=np.uint8)
         _, fake_left_image = cv2.imencode('.jpg', fake_left_image)
-        image_right_path = f'traj_predict/script/visualization/rgb/camera_right_{frame_num}.jpg'
-        fake_right_image = cv2.imread(image_right_path)
+        fake_right_image = np.random.randint(0, 256, (480, 640, 3), dtype=np.uint8)
         _, fake_right_image = cv2.imencode('.jpg', fake_right_image)
-        image_top_path = f'traj_predict/script/visualization/rgb/camera_top_{frame_num}.jpg'
-        fake_top_image = cv2.imread(image_top_path)
+        fake_top_image = np.random.randint(0, 256, (480, 640, 3), dtype=np.uint8)
         _, fake_top_image = cv2.imencode('.jpg', fake_top_image)
-
-
 
         fake_obs = {
             'images': {
@@ -562,8 +576,48 @@ def main_DTP():
             # 'pose': np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
             'pose': np.array([0.5720672011375427, -0.04308487847447395, 0.5743494629859924, 3.0456106722554175, 0.06872873345163044, -0.08510535636997513]),
         }
+        
+        # text = "put the red pepper and place it into bowl"
+        text = "put the red pepper and place it into basket"
+        # text = "open the pot"
+        # text = "grasp brown steame buns in the pan"
+        rgb_vis_top_now = fake_obs['images']['top']
+        rgb_vis_top_now = cv2.imdecode(rgb_vis_top_now, cv2.IMREAD_COLOR)
+        cv2.imshow("rgb_vis_top_now", rgb_vis_top_now)
+        key = cv2.waitKey(1) & 0xFF  # 等待键盘输入
+        if key == ord('r'):
+            print("Key 'r' pressed, reset arm to initial position reset")
+            # robot_env.reset_to_home()
+            # obs = robot_env.get_obs() # update obs
+            print("wait robot for five seconds")
+            time.sleep(5)
+            DTP_Eva.reset()
+        if key == ord('1'):
+            text = "grasp brown steamed buns in the pan"
+            print("Key '1' pressed, CURRENT TASK: grasp brown steamed buns in the pan")
+            DTP_Eva.reset()
+        if key == ord('2'):
+            text = "open the pot"
+            print("Key '2' pressed, CURRENT TASK: open the pot")
+            DTP_Eva.reset()
+        if key == ord('3'):
+            text = "put the yellow pepper and place it into bowl"
+            print("Key '3' pressed, CURRENT TASK: put the yellow pepper and place it into bowl")
+            DTP_Eva.reset()
+        if key == ord('4'):
+            text = "put the red pepper and place it into bowl"
+            print("Key '4' pressed, CURRENT TASK: put the red pepper and place it into bowl")
+            DTP_Eva.reset()
+        if key == ord('5'):
+            text = "put the yellow pepper and place it into basket"
+            print("Key '5' pressed, CURRENT TASK: put the yellow pepper and place it into basket")
+            DTP_Eva.reset() 
+        if key == ord('6'):
+            text = "put the red pepper and place it into basket"
+            print("Key '6' pressed, CURRENT TASK: put the red pepper and place it into basket")
+            DTP_Eva.reset() 
 
-        action = DTP_Eva.inference(fake_obs)
+        action = DTP_Eva.inference(fake_obs,text)
         frame_num += 1
         if frame_num > 110:
             frame_num = 0
