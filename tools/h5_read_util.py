@@ -162,9 +162,9 @@ if __name__ == '__main__':
 
 
     read_h5files = ReadH5Files(franka_3rgb)
-    # file_path = "/media/data/benchmark1_0_release_pretrain/h5_franka_3rgb/close_cap_trash_can_1/success_episodes/train/0927_141457/data/trajectory.hdf5"
-    file_path = '/media/data/benchmark2_0_eval/put_the_red_pepper_and_place_it_into_basket/success_episodes/train/0106_153800/data/trajectory.hdf5'
-    start_ts = 30
+    file_path = "/media/data/benchmark2_0_eval/open_the_pot/success_episodes/train/0106_102610/data/trajectory.hdf5"
+    # file_path = '/media/data/benchmark2_0_eval/put_the_red_pepper_and_place_it_into_basket/success_episodes/train/0106_153800/data/trajectory.hdf5'
+    start_ts = 20
     image_dict, control_dict, base_dict, is_sim, is_compress = read_h5files.execute(file_path, camera_frame=start_ts)
     frame = image_dict['rgb_images']
     

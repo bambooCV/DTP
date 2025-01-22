@@ -194,8 +194,16 @@ class LMDBDataset(Dataset):
                                             mode='replicate'  # 使用边缘像素填充
                                         )
                 traj_2d_top = loads(self.txn.get(f'traj_2d_top_{new_idx}'.encode()))
-                if len(traj_2d_top) < self.chunk_size/3:
+                if len(traj_2d_top) < self.chunk_size:
                     mask[i] = 0  
+                    # vis
+                    # traj_2d_top_trans = traj_2d_top * torch.tensor([0.5, 0.667])  + torch.tensor([0, 80]) # 坐标转换
+                    # rgb_vis = rgb_camera_top[i].permute(1, 2, 0).numpy().copy()
+                    # for (u, v) in traj_2d_top_trans:
+                    #     cv2.circle(rgb_vis, (int(u), int(v)), radius=5, color=(0, 255, 0), thickness=-1) 
+                    # cv2.imwrite("tools/visualization/train_rgb_vis.png", rgb_vis)  
+                    # print(len(traj_2d_top))
+                    # print('test')
                 else: 
                     traj_2d_top_trans = traj_2d_top * torch.tensor([0.5, 0.667])  + torch.tensor([0, 80]) # 坐标转换
                     top_actions[i,:,:] = resample_sequence_adapter(traj_2d_top_trans, self.chunk_size) # 坐标下采样

@@ -119,8 +119,9 @@ rgb_std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = TrajPredictPolicy()
 # 预训练模型读入
-model_path = "Save/Real_Robot_2D_evaluation_0114.pth"
+# model_path = "Save/Real_Robot_2D_evaluation_0114.pth"
 # model_path = "Save/Real_Robot_2D_evaluation_hflip.pth"
+model_path = "Save/Real_Robot_bs32_hflip_wash_last.pth"
 state_dict = torch.load(model_path,map_location=device)['model_state_dict']
 new_state_dict = {}
 for key, value in state_dict.items():
@@ -154,7 +155,7 @@ with torch.no_grad():
     # language = "put the yellow pepper and place it into basket"
     language = "put the red pepper and place it into basket"
     # language = "grasp brown steamed buns in the pan"
-    # language = "close the pot"
+    # language = "open the pot"
     tokenizer = clip.tokenize
     tokenized_text = tokenizer(language).to(device)
     # image = cv2.imread("/home/bamboofan/EmbodiedAI/multiview_dataaug/Grounded-Segment-Anything/A_visualization/pick_bread_ori.jpg")

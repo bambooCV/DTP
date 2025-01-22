@@ -220,7 +220,7 @@ def train(acc, train_prefetcher, test_prefetcher, preprocessor, model, env, eva,
                 pbar.set_postfix(
                     ordered_dict={
                         "epoch": epoch+1,
-                        "total loss": total_loss.item(),
+                        "total loss": loss['total_loss'].item(),
                         "lr": scheduler.get_last_lr()[0],
                     }
                 )
