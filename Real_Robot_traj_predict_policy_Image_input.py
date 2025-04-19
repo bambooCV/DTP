@@ -121,7 +121,7 @@ model = TrajPredictPolicy()
 # 预训练模型读入
 # model_path = "Save/Real_Robot_2D_evaluation_0114.pth"
 # model_path = "Save/Real_Robot_2D_evaluation_hflip.pth"
-model_path = "Save/Real_Robot_bs32_hflip_wash_last.pth"
+model_path = "Save/Real_Robot_bs64_hflip_wash_last_frank_5tasks.pth"
 state_dict = torch.load(model_path,map_location=device)['model_state_dict']
 new_state_dict = {}
 for key, value in state_dict.items():
@@ -146,16 +146,24 @@ noise_scheduler = DDPMScheduler(
     # our network predicts noise (instead of denoised action)
     prediction_type='epsilon'
 )
-
+# # franka
+# "place_in_bread_on_plate_2", 'Put the bread onto the plate'
+# "pick_up_strawberry_in_bowl",'pick up strawberry in bowl'
+# "open_cap_trash_can_1",'open the trash can'
+# "241022_side_pull_close_drawer_1",'Close the drawer by pulling from the side'
+# "241022_side_pull_open_drawer_1",'Open the drawer by pulling from the side'
 
 with torch.no_grad():
     model.eval()
     # language = "put the yellow pepper and place it into bowl"
     # language = "put the red pepper and place it into bowl"
     # language = "put the yellow pepper and place it into basket"
-    language = "put the red pepper and place it into basket"
+    # language = "put the red pepper and place it into basket"
     # language = "grasp brown steamed buns in the pan"
     # language = "open the pot"
+    
+    # language = "Put the bread onto the plate"
+    language = "close the drawer by pulling from the side"
     tokenizer = clip.tokenize
     tokenized_text = tokenizer(language).to(device)
     # image = cv2.imread("/home/bamboofan/EmbodiedAI/multiview_dataaug/Grounded-Segment-Anything/A_visualization/pick_bread_ori.jpg")

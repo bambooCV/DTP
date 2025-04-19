@@ -141,7 +141,7 @@ if __name__ == '__main__':
     #                'controls': ['joint_position',  'end_effector']}
     franka_3rgb = {
             'camera_sensors': ['rgb_images'],
-            'camera_names': ['camera_left', 'camera_right', 'camera_top','camera_wrist'],
+            'camera_names': ['camera_left', 'camera_right', 'camera_top'],
             'arms': ['puppet'],
             'controls': ['joint_position', 'end_effector'],
             'use_robot_base': False
@@ -160,11 +160,13 @@ if __name__ == '__main__':
     }
 
 
-
+    # target_dirs = ["place_in_bread_on_plate_2","pick_up_strawberry_in_bowl","open_cap_trash_can_1",
+    #                "241022_side_pull_close_drawer_1","241022_side_pull_open_drawer_1"]
     read_h5files = ReadH5Files(franka_3rgb)
-    file_path = "/media/data/benchmark2_0_eval/open_the_pot/success_episodes/train/0106_102610/data/trajectory.hdf5"
+    # file_path = "/media/data/benchmark1_0_release/h5_franka_3rgb/place_in_bread_on_plate_2/success_episodes/val/1016_102612/data/trajectory.hdf5"
+    file_path = "/media/data/benchmark1_0_release/h5_franka_3rgb/241022_side_pull_close_drawer_1/success_episodes/train/1022_104333/data/trajectory.hdf5"
     # file_path = '/media/data/benchmark2_0_eval/put_the_red_pepper_and_place_it_into_basket/success_episodes/train/0106_153800/data/trajectory.hdf5'
-    start_ts = 20
+    start_ts = 2
     image_dict, control_dict, base_dict, is_sim, is_compress = read_h5files.execute(file_path, camera_frame=start_ts)
     frame = image_dict['rgb_images']
     

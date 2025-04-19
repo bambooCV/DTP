@@ -44,7 +44,7 @@ def contains_words(inst, include_words=[], exclude_words=[]):
             return False
     return True
 def save_checkpoint(epoch, model, optimizer,  loss,save_dir="./Save"):
-    save_path = os.path.join(save_dir, f'Real_Robot_bs32_hflip_wash_last.pth')
+    save_path = os.path.join(save_dir, f'Real_Robot_bs64_hflip_wash_last_frank_5tasks.pth')
     
     # 要排除的模块列表
     modules_to_exclude = ['model_mae', 'model_clip']
@@ -160,14 +160,14 @@ if __name__ == '__main__':
     )
     wandb_model = False
     if wandb_model and acc.is_main_process:
-        wandb.init(project='Real Robot 2D Trajectory generation', group='evaluation', name='20250114')
+        wandb.init(project='Real Robot 2D Trajectory generation', group='franka 5tasks', name='20250122')
     device = acc.device
     # config prepare
     epoch_num = 100
     batch_size_train = 16
     batch_size_val = 64
     num_workers = 4
-    lmdb_dir = "/media/users/bamboo/dataset/lmdb/evaluation_1/"
+    lmdb_dir = "/media/users/bamboo/dataset/lmdb/benchmark1_0_release_pretrain_franka_5tasks/"
     #image preprocess
     preprocessor = Real_Robot_2D_PreProcess(
         rgb_static_pad = 20, # 去除位置敏感性

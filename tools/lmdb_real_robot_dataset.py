@@ -127,12 +127,16 @@ def get_subdirectories(data_dir, target_dirs=None):
 def get_files(dataset_dirs, robot_infor, dateset_type='train'):
     read_h5files = ReadH5Files(robot_infor)
     
-    target_dirs = ["put_the_red_pepper_and_place_it_into_bowl"]
+    # target_dirs = ["put_the_red_pepper_and_place_it_into_bowl"]
     # target_dirs = ["open_the_pot", "grasp_brown_steamed_buns_in_the_pan",
     #                "put_the_yellow_pepper_and_place_it_into_bowl","put_the_red_pepper_and_place_it_into_bowl",
     #                "put_the_yellow_pepper_and_place_it_into_basket","put_the_red_pepper_and_place_it_into_basket",
     #                "close_the_pot"]
     # target_dirs = None
+    # target_dirs = [
+    #             "241022_side_pull_close_drawer_1","241022_side_pull_open_drawer_1"]
+    target_dirs = ["place_in_bread_on_plate_2","pick_up_strawberry_in_bowl","open_cap_trash_can_1",
+                   "241022_side_pull_close_drawer_1","241022_side_pull_open_drawer_1"]
     dataset_dirs = get_subdirectories(dataset_dirs,target_dirs)
     files = []
 
@@ -195,7 +199,7 @@ def worldtopixel_point(traj,rgb, camera_intrinsics,camera_extrinsics):
         v = (camera_intrinsics[1, 1] * camera_coordinates[:, 1] / camera_coordinates[:, 2]) + camera_intrinsics[1, 2]
 
         pixel_coordinates = np.stack((u, v), axis=-1) 
-
+        pixel_coordinates = np.maximum(pixel_coordinates, 1)
         # 校验 pixel_coordinates 的合法性
         valid_mask = (pixel_coordinates[:, 0] >= 0) & (pixel_coordinates[:, 0] < rgb.shape[2]) & \
                     (pixel_coordinates[:, 1] >= 0) & (pixel_coordinates[:, 1] < rgb.shape[1])
@@ -293,8 +297,14 @@ def save_to_lmdb(output_dir, input_dir, dateset_type):
         for index, len_ep in enumerate(all_episode_len):
             print(f'{index/len(all_episode_len)}')
             trial_file = trial_files[index]
-            inst = Path(trial_file).parts[4].replace('_', ' ')
-            print("inst: ", inst)
+            with h5py.File(trial_file, 'r') as root:
+                if 'language_raw' in root.keys():
+                    inst = root['language_raw'][0].decode('utf-8')
+                    print("dataset inst: ", inst)
+                else:
+                    # 根据文件名字定义
+                    inst = Path(trial_file).parts[-6].replace('_', ' ')
+                    print("inst: ", inst)
             # inst = "pick up the bread and put it on the plate" 
             txn.put(f'inst_{cur_episode}'.encode(), dumps(inst))
             with torch.no_grad():
@@ -309,8 +319,9 @@ def save_to_lmdb(output_dir, input_dir, dateset_type):
                 trial_file = trial_files[index]
 
                 top_camera_extrinsics_update = np.copy(top_camera_extrinsics)
-                top_camera_extrinsics_update[1, 3] += 0.12  #pixel y +为左方向
-                top_camera_extrinsics_update[0, 3] -= 0.03  #pixel x +为上方向
+                # 看是否需要补偿相机位置
+                # top_camera_extrinsics_update[1, 3] += 0.12  #pixel y +为左方向
+                # top_camera_extrinsics_update[0, 3] -= 0.03  #pixel x +为上方向
                 # 图像
                 image_dict, control_dict, base_dict, is_sim, is_compress = read_h5files.execute(trial_file, camera_frame=start_ts, use_depth_image=False)
                 # filter static action from begnning
@@ -333,10 +344,10 @@ def save_to_lmdb(output_dir, input_dir, dateset_type):
                     traj_2d_top_tensor = torch.tensor(traj_2d_top)
                     txn.put(f'traj_2d_top_{cur_step}'.encode(), dumps(traj_2d_top_tensor))
                     # visualization
-                    rgb_vis = rgb_camera_top.permute(1, 2, 0).numpy()
-                    for (u, v) in traj_2d_top_tensor:
-                        cv2.circle(rgb_vis, (int(u), int(v)), radius=5, color=(0, 255, 0), thickness=-1)  # 绿色点
-                    cv2.imwrite(f"tools/visualization/rgb_vis_top_{index}_{start_ts}.png", rgb_vis)
+                    # rgb_vis = rgb_camera_top.permute(1, 2, 0).numpy()
+                    # for (u, v) in traj_2d_top_tensor:
+                    #     cv2.circle(rgb_vis, (int(u), int(v)), radius=5, color=(0, 255, 0), thickness=-1)  # 绿色点
+                    # cv2.imwrite(f"tools/visualization/rgb_vis_top_{index}_{start_ts}.png", rgb_vis)
                     
                     traj_2d_left = worldtopixel_point(traj,rgb_camera_left, left_camera_intrinsics,left_camera_extrinsics)
                     traj_2d_left_tensor = torch.tensor(traj_2d_left)
@@ -352,7 +363,7 @@ def save_to_lmdb(output_dir, input_dir, dateset_type):
                     # rgb_vis = rgb_camera_right.permute(1, 2, 0).numpy()
                     # for (u, v) in traj_2d_right_tensor:
                     #     cv2.circle(rgb_vis, (int(u), int(v)), radius=5, color=(0, 255, 0), thickness=-1)  # 绿色点
-                    # cv2.imwrite(f"traj_predict/script/visualization/dataset/rgb_vis_right_{index}_{start_ts}.png", rgb_vis)
+                    # cv2.imwrite(f"tools/visualization/rgb_vis_right_{index}_{start_ts}.png", rgb_vis)
 
                     
                     if start_ts == 0:# 起始点存储
@@ -409,8 +420,12 @@ if __name__ == '__main__':
     # parser.add_argument("--output_dir", default='/nfsroot/DATA/IL_Research/datasets/dual_franka/real_franka_1/h5_data_1/241016_remove_blue_cube_pink_1/success_episodes_lmdb_1', type=str, help="Target dataset directory.") #debug
     # parser.add_argument("--input_dir", default='/nfsroot/DATA/users/embodied_ai/gary/pick_bread_plate/', type=str, help="Original dataset directory.")
     # parser.add_argument("--output_dir", default='/bamboo_dir/pick_bread_plate/success_episodes_lmdb_1', type=str, help="Target dataset directory.")
-    parser.add_argument("--input_dir", default='/media/data/benchmark2_0_eval/', type=str, help="Original dataset directory.")
-    parser.add_argument("--output_dir", default='/media/users/bamboo/dataset/lmdb/evaluation_1/', type=str, help="Target dataset directory.")
+    # parser.add_argument("--input_dir", default='/media/data/benchmark2_0_eval/', type=str, help="Original dataset directory.")
+    # parser.add_argument("--output_dir", default='/media/users/bamboo/dataset/lmdb/evaluation_1/', type=str, help="Target dataset directory.")
+    
+    parser.add_argument("--input_dir", default='/media/data/benchmark1_0_release_pretrain/h5_franka_3rgb', type=str, help="Original dataset directory.")
+    parser.add_argument("--output_dir", default='/media/users/bamboo/dataset/lmdb/benchmark1_0_release_pretrain_franka_5tasks/', type=str, help="Target dataset directory.")
+    
     args = parser.parse_args()
     model_clip, _ = clip.load('/media/users/bamboo/PretrainModel/clip/ViT-B-32.pt', device='cuda:0')
     if not os.path.exists(args.output_dir):
