@@ -169,7 +169,7 @@ if __name__ == '__main__':
     # target_dirs = ["place_in_bread_on_plate_2","pick_up_strawberry_in_bowl","open_cap_trash_can_1",
     #                "241022_side_pull_close_drawer_1","241022_side_pull_open_drawer_1"]
     read_h5files = ReadH5Files(franka_3rgb_station)
-    file_path = "/media/users/wk/IL_research/datasets/20250423/h5_data/franka_emika_singleArm-gripper-4cameras_2/franka_2_open_the_upper_drawer_2025-4-18/success_episodes/val/0418_151247/data/trajectory.hdf5"
+    file_path = "/media/users/wk/IL_research/datasets/20250423/h5_data/franka_emika_singleArm-gripper-4cameras_2/franka_2_open_the_upper_drawer_250415/success_episodes/train/0415_101135/data/trajectory.hdf5"
     start_ts = 2
     image_dict, control_dict, base_dict, is_sim, is_compress = read_h5files.execute(file_path, camera_frame=start_ts)
     frame = image_dict['rgb_images']

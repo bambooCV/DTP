@@ -26,8 +26,6 @@ class ReadH5Files():
         self.arms = robot_infor['arms']
         self.robot_infor = robot_infor['controls']
 
-        # 'joint_velocity_left', 'joint_velocity_right',
-        # 'joint_effort_left', 'joint_effort_right',
         pass
 
     def decoder_image(self, camera_rgb_images, camera_depth_images=None):
@@ -127,15 +125,16 @@ def get_subdirectories(data_dir, target_dirs=None):
 def get_files(dataset_dirs, robot_infor, dateset_type='train'):
     read_h5files = ReadH5Files(robot_infor)
        
-    # target_dirs = [
-    #             "franka_2_open_the_upper_drawer_2025-4-17",           "franka_2_open_the_upper_drawer_2025-4-18",            "franka_2_open_the_upper_drawer_250415",
-    #             "franka_2_pick_bread_and_place_into_drawer_2025-4-17","franka_2_pick_bread_and_place_into_drawer_2025-4-18", "franka_2_pick_bread_and_place_into_drawer_250415",
-    #             "franka_2_close_the_upper_drawer_2025-4-17",          "franka_2_close_the_upper_drawer_2025-4-18",           "franka_2_close_the_upper_drawer_250415"
-    #             ]
     target_dirs = [
-                "franka_2_open_the_upper_drawer_2025-4-18"
-                # "franka_2_open_the_upper_drawer_250415","franka_2_pick_bread_and_place_into_drawer_250415", "franka_2_close_the_upper_drawer_250415"
+                "franka_2_open_the_upper_drawer_2025-4-17",           "franka_2_open_the_upper_drawer_2025-4-18",            "franka_2_open_the_upper_drawer_250415",
+                "franka_2_pick_bread_and_place_into_drawer_2025-4-17","franka_2_pick_bread_and_place_into_drawer_2025-4-18", "franka_2_pick_bread_and_place_into_drawer_250415",
+                "franka_2_close_the_upper_drawer_2025-4-17",          "franka_2_close_the_upper_drawer_2025-4-18",           "franka_2_close_the_upper_drawer_250415"
                 ]
+    # target_dirs = [
+    #             # "franka_2_close_the_upper_drawer_2025-4-17", 
+    #             # "franka_2_close_the_upper_drawer_250415",
+    #             # "franka_2_open_the_upper_drawer_250415","franka_2_pick_bread_and_place_into_drawer_250415", "franka_2_close_the_upper_drawer_250415"
+    #             ]
     dataset_dirs = get_subdirectories(dataset_dirs,target_dirs)
     files = []
 
@@ -212,17 +211,13 @@ def worldtopixel_point(traj,rgb, camera_intrinsics,camera_extrinsics,gripper_off
         # cv2.imwrite("traj_predict/script/rgb_vis.png", rgb_vis)
         return valid_pixel_coordinates
 def convert_7d_to_6d(pose_7d):
-
-    positions = pose_7d[:, :3]  # shape=(sequence_length, 3) for xyz
-    quaternions = pose_7d[:, 3:]  # shape=(sequence_length, 4) for quaternions
+    positions = pose_7d[:, :3]
+    quaternions = pose_7d[:, 3:]
     
-    # 使用scipy的Rotation批量转换四元数为欧拉角
     r = Rotation.from_quat(quaternions)
-    euler_angles = r.as_euler('xyz', degrees=False)  # shape=(sequence_length, 3)
+    euler_angles = r.as_euler('xyz', degrees=False)
     
-    # 组合位置和欧拉角
-    pose_6d = np.concatenate([positions, euler_angles], axis=1)  # shape=(sequence_length, 6)
-    
+    pose_6d = np.concatenate([positions, euler_angles], axis=1)
     return pose_6d
 
 def save_to_lmdb(output_dir, input_dir, dateset_type):
@@ -237,6 +232,9 @@ def save_to_lmdb(output_dir, input_dir, dateset_type):
     files = get_files(input_dir, robot_infor, dateset_type)
 
     # 内参矩阵
+    # top_camera_intrinsics = np.array([[642.928955078125, 0, 642.904052734375], 
+    #                                   [0, 642.08837890625, 370.2384338378906], 
+    #                                   [0, 0, 1]])
     top_camera_intrinsics = np.array([[642.928955078125*0.5, 0, 642.904052734375*0.5], 
                                       [0, 642.08837890625*0.667, 370.2384338378906*0.667], 
                                       [0, 0, 1]])
@@ -246,11 +244,11 @@ def save_to_lmdb(output_dir, input_dir, dateset_type):
                                     [-0.04211909, -0.69332317, -0.71939486,  0.84467367],
                                     [ 0.,          0.,          0.,          1.]])
 
-    right_camera_intrinsics = np.array([
+    left_camera_intrinsics = np.array([
                                     [387.8, 0.0, 320.5],
                                     [0.0, 387.4, 242.9],
                                     [0.0, 0.0, 1.0]])
-    right_camera_extrinsics = np.array([[-0.89193097,  0.29158009, -0.3456012,   0.85225669],
+    left_camera_extrinsics = np.array([[-0.89193097,  0.29158009, -0.3456012,   0.85225669],
                                     [ 0.451456,    0.6172287,  -0.64437273,  0.55364429],
                                     [ 0.02542872, -0.73075973, -0.68216097,  0.54680531],
                                     [ 0.        ,  0.        ,  0.        ,  1.        ]])
@@ -296,8 +294,8 @@ def save_to_lmdb(output_dir, input_dir, dateset_type):
             print(f'{index/len(all_episode_len)}')
             trial_file = trial_files[index]
             with h5py.File(trial_file, 'r') as root:
-                if 'language_raw' in root.keys():
-                    inst = root['language_raw'][0].decode('utf-8')
+                if 'language_instruction' in root.keys():
+                    inst = root['language_instruction'][()].decode('utf-8')
                     print("dataset inst: ", inst)
                 else:
                     # 根据文件名字定义
@@ -328,44 +326,53 @@ def save_to_lmdb(output_dir, input_dir, dateset_type):
                     continue
                 else:
                     frame = image_dict['rgb_images']
-                    rgb_camera_left = torch.from_numpy(rearrange(frame['camera_top'], 'h w c -> c h w'))
-                    txn.put(f'rgb_camera_left_{cur_step}'.encode(), dumps(encode_jpeg(rgb_camera_left)))
-                    rgb_camera_right = torch.from_numpy(rearrange(frame['camera_right'], 'h w c -> c h w'))
-                    txn.put(f'rgb_camera_right_{cur_step}'.encode(), dumps(encode_jpeg(rgb_camera_right)))
-                    rgb_camera_top = torch.from_numpy(rearrange(frame['camera_left'], 'h w c -> c h w'))
-                    txn.put(f'rgb_camera_top_{cur_step}'.encode(), dumps(encode_jpeg(rgb_camera_top)))
-
-                    # 2d_trajectory
-                    # 判断control_dict['puppet']['end_effector']最后一维的维度
                     if control_dict['puppet']['end_effector'].shape[-1] == 7:
+                        rgb_camera_left = torch.from_numpy(rearrange(frame['camera_left'], 'h w c -> c h w'))
+                        rgb_camera_left = resize(rgb_camera_left, [480, 640]).to(torch.uint8)
+                        txn.put(f'rgb_camera_left_{cur_step}'.encode(), dumps(encode_jpeg(rgb_camera_left)))
+                        rgb_camera_right = torch.from_numpy(rearrange(frame['camera_right'], 'h w c -> c h w'))
+                        rgb_camera_right = resize(rgb_camera_right, [480, 640]).to(torch.uint8)
+                        txn.put(f'rgb_camera_right_{cur_step}'.encode(), dumps(encode_jpeg(rgb_camera_right)))
+                        rgb_camera_top = torch.from_numpy(rearrange(frame['camera_top'], 'h w c -> c h w'))
+                        # rgb_camera_top = resize(rgb_camera_top, [480, 640]).to(torch.uint8)
+                        txn.put(f'rgb_camera_top_{cur_step}'.encode(), dumps(encode_jpeg(rgb_camera_top)))
+                        rgb_camera_wrist = torch.from_numpy(rearrange(frame['camera_wrist'], 'h w c -> c h w'))
+                        rgb_camera_wrist = resize(rgb_camera_wrist, [480, 640]).to(torch.uint8)
+                        txn.put(f'rgb_camera_wrist_{cur_step}'.encode(), dumps(encode_jpeg(rgb_camera_wrist)))
                         control_dict['puppet']['end_effector'] = convert_7d_to_6d(control_dict['puppet']['end_effector'])
+                    else:
+                        rgb_camera_left = torch.from_numpy(rearrange(frame['camera_right'], 'h w c -> c h w'))
+                        txn.put(f'rgb_camera_left_{cur_step}'.encode(), dumps(encode_jpeg(rgb_camera_left)))
+                        rgb_camera_right = torch.from_numpy(rearrange(frame['camera_top'], 'h w c -> c h w'))
+                        txn.put(f'rgb_camera_right_{cur_step}'.encode(), dumps(encode_jpeg(rgb_camera_right)))
+                        rgb_camera_top = torch.from_numpy(rearrange(frame['camera_left'], 'h w c -> c h w'))
+                        txn.put(f'rgb_camera_top_{cur_step}'.encode(), dumps(encode_jpeg(rgb_camera_top)))
 
+                    
                     traj = control_dict['puppet']['end_effector'][start_ts:]
                     
                     traj_2d_top = worldtopixel_point(traj,rgb_camera_top, top_camera_intrinsics,top_camera_extrinsics_update,0.1)
                     traj_2d_top_tensor = torch.tensor(traj_2d_top)
-                    # scale_factors = torch.tensor([2/3, 0.5])
-                    # traj_2d_top_tensor = traj_2d_top_tensor * scale_factors # 转换到top相机坐标系
                     txn.put(f'traj_2d_top_{cur_step}'.encode(), dumps(traj_2d_top_tensor))
                     # visualization
-                    rgb_vis = rgb_camera_top.permute(1, 2, 0).numpy()
-                    for (u, v) in traj_2d_top_tensor:
-                        cv2.circle(rgb_vis, (int(u), int(v)), radius=5, color=(0, 255, 0), thickness=-1)  # 绿色点
-                    cv2.imwrite(f"tools/visualization/rgb_vis_top_{index}_{start_ts}.png", rgb_vis)
+                    # rgb_vis = rgb_camera_top.permute(1, 2, 0).numpy().copy()
+                    # for (u, v) in traj_2d_top_tensor:
+                    #     cv2.circle(rgb_vis, (int(u), int(v)), radius=5, color=(0, 255, 0), thickness=-1)  # 绿色点
+                    # cv2.imwrite(f"tools/visualization/rgb_vis_top_{index}_{start_ts}.png", rgb_vis)
                     
-                    traj_2d_right = worldtopixel_point(traj,rgb_camera_right, right_camera_intrinsics,right_camera_extrinsics,0.15)
-                    traj_2d_right_tensor = torch.tensor(traj_2d_right)
-                    txn.put(f'traj_2d_right_{cur_step}'.encode(), dumps(traj_2d_right_tensor))
+                    traj_2d_left = worldtopixel_point(traj,rgb_camera_left, left_camera_intrinsics,left_camera_extrinsics,0.15)
+                    traj_2d_left_tensor = torch.tensor(traj_2d_left)
+                    txn.put(f'traj_2d_left_{cur_step}'.encode(), dumps(traj_2d_left_tensor))
                     # visualization
-                    rgb_vis = rgb_camera_right.permute(1, 2, 0).numpy()
-                    for (u, v) in traj_2d_right_tensor:
-                        cv2.circle(rgb_vis, (int(u), int(v)), radius=5, color=(0, 255, 0), thickness=-1)  # 绿色点
-                    cv2.imwrite(f"tools/visualization/rgb_vis_right_{index}_{start_ts}.png", rgb_vis)
+                    # rgb_vis = rgb_camera_left.permute(1, 2, 0).numpy().copy()
+                    # for (u, v) in traj_2d_left_tensor:
+                    #     cv2.circle(rgb_vis, (int(u), int(v)), radius=5, color=(0, 255, 0), thickness=-1)  # 绿色点
+                    # cv2.imwrite(f"tools/visualization/rgb_vis_left_{index}_{start_ts}.png", rgb_vis)
 
                     
                     if start_ts == 0:# 起始点存储
                         txn.put(f'traj_2d_top_init_{cur_episode}'.encode(), dumps(traj_2d_top_tensor))
-                        txn.put(f'traj_2d_right_init_{cur_episode}'.encode(), dumps(traj_2d_right_tensor))
+                        txn.put(f'traj_2d_left_init_{cur_episode}'.encode(), dumps(traj_2d_left_tensor))
 
                     txn.put('cur_step'.encode(), dumps(cur_step))
                     txn.put(f'cur_episode_{cur_step}'.encode(), dumps(cur_episode))
