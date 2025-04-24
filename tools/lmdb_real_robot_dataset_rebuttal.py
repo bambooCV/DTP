@@ -128,11 +128,10 @@ def get_files(dataset_dirs, robot_infor, dateset_type='train'):
     read_h5files = ReadH5Files(robot_infor)
        
     target_dirs = [
-                "franka_2_open_the_upper_drawer_2025-4-17",           "franka_2_open_the_upper_drawer_2025-4-18",            "franka_2_open_the_upper_drawer_250415",
-                "franka_2_pick_bread_and_place_into_drawer_2025-4-17","franka_2_pick_bread_and_place_into_drawer_2025-4-18", "franka_2_pick_bread_and_place_into_drawer_250415",
-                "franka_2_close_the_upper_drawer_2025-4-17",          "franka_2_close_the_upper_drawer_2025-4-18",           "franka_2_close_the_upper_drawer_250415"
+                # "franka_2_open_the_upper_drawer_2025-4-17",  "franka_2_pick_bread_and_place_into_drawer_2025-4-17",  "franka_2_close_the_upper_drawer_2025-4-17",
+                # "franka_2_open_the_upper_drawer_2025-4-18",  "franka_2_pick_bread_and_place_into_drawer_2025-4-18",  "franka_2_close_the_upper_drawer_2025-4-18",
+                "franka_2_open_the_upper_drawer_250415",     "franka_2_pick_bread_and_place_into_drawer_250415",     "franka_2_close_the_upper_drawer_250415",
                 ]
-
     # target_dirs = [
     #             "franka_2_close_the_upper_drawer_2025-4-17", 
     #             # "franka_2_close_the_upper_drawer_250415",
@@ -291,10 +290,13 @@ def save_to_lmdb(output_dir, input_dir, dateset_type):
             cur_step = 0
             cur_episode = 0
         
-        all_joint_position = []
-        all_delta_joint_position = []
+        episode_joint_position_mean = []
+        episode_joint_position_std = []
+        episode_joint_position_min = []
+        episode_joint_position_max = []
         for index, len_ep in enumerate(all_episode_len):
-            print(f'{index/len(all_episode_len)}')
+            episode_joint_position = []
+            print(f'Index: {index}, Total Episodes: {len(all_episode_len)}, Progress: {index/len(all_episode_len):.2%}')
             trial_file = trial_files[index]
             with h5py.File(trial_file, 'r') as root:
                 if 'language_instruction' in root.keys():
@@ -328,6 +330,7 @@ def save_to_lmdb(output_dir, input_dir, dateset_type):
                 if np.all(diff < threshold):
                     continue
                 else:
+                    
                     frame = image_dict['rgb_images']
                     if control_dict['puppet']['end_effector'].shape[-1] == 7:
                         rgb_camera_left = torch.from_numpy(rearrange(cv2.resize(frame['camera_left'], (640, 480)), 'h w c -> c h w'))
@@ -382,45 +385,30 @@ def save_to_lmdb(output_dir, input_dir, dateset_type):
                     # 对应的action
                     joint_position = control_dict['puppet']['arm_joint_position'][start_ts]
                     txn.put(f'joint_position_{cur_step}'.encode(), dumps(torch.from_numpy(joint_position)))
-                    all_joint_position.append(torch.from_numpy(joint_position).unsqueeze(0))
+                    episode_joint_position.append(torch.from_numpy(joint_position).unsqueeze(0))
 
-                    delta_joint_position = control_dict['puppet']['arm_joint_position'][start_ts + 1] - control_dict['puppet']['arm_joint_position'][start_ts]
-                    txn.put(f'delta_joint_position_{cur_step}'.encode(), dumps(torch.from_numpy(delta_joint_position)))
-                    all_delta_joint_position.append(torch.from_numpy(delta_joint_position).unsqueeze(0))
-                    end_effector = control_dict['puppet']['end_effector'][start_ts]
-                    txn.put(f'end_effector_{cur_step}'.encode(), dumps(torch.from_numpy(end_effector)))
-                    delta_end_effector = control_dict['puppet']['end_effector'][start_ts + 1] - control_dict['puppet']['end_effector'][start_ts]
-                    txn.put(f'delta_end_effector_{cur_step}'.encode(), dumps(torch.from_numpy(delta_end_effector)))
-                    
                     # 计算并清理所有内存
-                    del image_dict, control_dict, base_dict, is_sim, is_compress
-                    del rgb_camera_left, rgb_camera_right, rgb_camera_top, rgb_camera_wrist,frame
-                    gc.collect()
+                    # del image_dict, control_dict, base_dict, is_sim, is_compress
+                    # del rgb_camera_left, rgb_camera_right, rgb_camera_top, rgb_camera_wrist,frame
+                    # gc.collect()
                     # process = psutil.Process()
                     # print(f"Memory usage: {process.memory_info().rss / 1024 / 1024:.2f} MB")
                     cur_step += 1
+            episode_joint_position = torch.cat(episode_joint_position, dim=0)
+            episode_joint_position_mean.append(episode_joint_position.mean(dim=[0]).float())
+            episode_joint_position_std.append(torch.clip(episode_joint_position.std(dim=[0]).float(), 1e-2, np.inf))  # clipping
+            episode_joint_position_min.append(episode_joint_position.min(dim=0).values.float())
+            episode_joint_position_max.append(episode_joint_position.max(dim=0).values.float())
             txn.put(f'done_{cur_step-1}'.encode(), dumps(True))
             cur_episode += 1
         # stats joint
-        all_joint_position = torch.cat(all_joint_position, dim=0)
-        all_joint_position_mean = all_joint_position.mean(dim=[0]).float()
-        all_joint_position_std = all_joint_position.std(dim=[0]).float()
-        all_joint_position_std = torch.clip(all_joint_position_std, 1e-2, np.inf)  # clipping
-        all_joint_position_min = all_joint_position.min(dim=0).values.float()
-        all_joint_position_max = all_joint_position.max(dim=0).values.float()
-        # stats delta joint
-        all_delta_joint_position = torch.cat(all_delta_joint_position, dim=0)
-        all_delta_joint_position_mean = all_delta_joint_position.mean(dim=[0]).float()
-        all_delta_joint_position_std = all_delta_joint_position.std(dim=[0]).float()
-        all_delta_joint_position_std = torch.clip(all_delta_joint_position_std, 1e-2, np.inf)  # clipping
-
-        all_delta_joint_position_min = all_delta_joint_position.min(dim=0).values.float()
-        all_delta_joint_position_max = all_delta_joint_position.max(dim=0).values.float()
+        all_joint_position_mean = sum(episode_joint_position_mean) / len(episode_joint_position_mean)
+        all_joint_position_std = sum(episode_joint_position_std) / len(episode_joint_position_std)
+        all_joint_position_min = sum(episode_joint_position_min) / len(episode_joint_position_min)
+        all_joint_position_max = sum(episode_joint_position_max) / len(episode_joint_position_max)
         eps = 0.0001
         stats = {"joint_mean": all_joint_position_mean, "joint_std": all_joint_position_std,
-                "joint_min": all_joint_position_min - eps, "joint_max": all_joint_position_max + eps,
-                "delta_joint_mean": all_delta_joint_position_mean, "delta_joint_std": all_delta_joint_position_std,
-                "delta_joint_min": all_delta_joint_position_min - eps, "delta_joint_max": all_delta_joint_position_max + eps}
+                "joint_min": all_joint_position_min - eps, "joint_max": all_joint_position_max + eps}
         txn.put(b'stats', dumps(stats))
 
     env.close()
@@ -428,7 +416,7 @@ def save_to_lmdb(output_dir, input_dir, dateset_type):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Transfer real franka robot dataset to lmdb format.")
     parser.add_argument("--input_dir", default='/media/users/wk/IL_research/datasets/20250423/h5_data/franka_emika_singleArm-gripper-4cameras_2', type=str, help="Original dataset directory.")
-    parser.add_argument("--output_dir", default='/media/users/bamboo/dataset/lmdb/ral_rebuttal/', type=str, help="Target dataset directory.")
+    parser.add_argument("--output_dir", default='/media/users/bamboo/dataset/lmdb/ral_rebuttal_2/', type=str, help="Target dataset directory.")
     # parser.add_argument("--output_dir", default='/media/users/bamboo/dataset/lmdb/test/', type=str, help="Target dataset directory.")
     args = parser.parse_args()
     model_clip, _ = clip.load('/media/users/bamboo/PretrainModel/clip/ViT-B-32.pt', device='cuda:0')
