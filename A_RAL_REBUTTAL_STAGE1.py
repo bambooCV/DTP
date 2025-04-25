@@ -160,7 +160,7 @@ if __name__ == '__main__':
     device = acc.device
     # config prepare
     epoch_num = 100
-    batch_size_train = 16
+    batch_size_train = 64
     batch_size_val = 64
     num_workers = 4
     lmdb_dir = "/media/users/bamboo/dataset/lmdb/ral_rebuttal_2/"
@@ -266,10 +266,10 @@ if __name__ == '__main__':
                 model.train()
                 # batch data for training  image_features.language_features.naction
                 language = batch['inst_token']
-                image = batch['rgb_camera_top']
-                naction = batch['top_actions']
+                image = batch['rgb_camera']
+                naction = batch['actions']
                 
-                rgb_top_norm,naction_transformed = preprocessor.rgb_process(batch['rgb_camera_top'],batch['top_actions'],train=True) 
+                rgb_norm,naction_transformed = preprocessor.rgb_process(batch['rgb_camera'],batch['actions'],train=True) 
                 naction_trans_norm = normalize_data(naction_transformed)
 
                 timesteps = torch.randint(
@@ -280,7 +280,7 @@ if __name__ == '__main__':
                 b,s,chunk_size,dim = noisy_actions.shape
                 noisy_actions = noisy_actions.reshape(b*s,chunk_size,dim)
                 
-                noise_pred,_,_,_ = model(rgb_top_norm, language, timesteps, noisy_actions)
+                noise_pred,_,_,_ = model(rgb_norm, language, timesteps, noisy_actions)
                 # loss = nn.functional.mse_loss(noise_pred, noise.squeeze(1)) 原始loss
                 mask = batch['mask'].unsqueeze(-1).expand_as(noise_pred) # 先广播到同样大小
                 masked_loss = nn.functional.mse_loss(noise_pred * mask, noise.squeeze(1) * mask, reduction='none')
@@ -329,15 +329,15 @@ if __name__ == '__main__':
                 batch, load_time = val_prefetcher.next()
                 val_index = 0
                 # 算 light bulb
-                while batch is not None and val_index < 50:
+                while batch is not None and val_index < 1000:
                     eval_flag = True
                     if eval_flag:
                         model.eval()
                         language = batch['inst_token']
-                        image = batch['rgb_camera_top']
-                        naction = batch['top_actions']
+                        image = batch['rgb_camera']
+                        naction = batch['actions']
                         # example inputs
-                        rgb_top_norm,naction_transformed = preprocessor.rgb_process(batch['rgb_camera_top'],batch['top_actions'],train=False)    
+                        rgb_norm,naction_transformed = preprocessor.rgb_process(batch['rgb_camera'],batch['actions'],train=False)    
                         naction_trans_norm = normalize_data(naction_transformed)
                         noisy_action = torch.randn(naction.shape, device=device)
                         batch_val_size,sequence,chunk_size,dim = noisy_action.shape
@@ -348,7 +348,7 @@ if __name__ == '__main__':
                         language_embedding, obs_embeddings, patch_embeddings = None, None, None
                         for k in noise_scheduler.timesteps:
                             # predict noise
-                            noise_pred, language_embedding, obs_embeddings, patch_embeddings = model(rgb_top_norm, language, timesteps=k, noisy_actions=out_action,
+                            noise_pred, language_embedding, obs_embeddings, patch_embeddings = model(rgb_norm, language, timesteps=k, noisy_actions=out_action,
                                                 language_embedding=language_embedding, obs_embeddings=obs_embeddings, patch_embeddings=patch_embeddings)
                             # inverse diffusion step (remove noise)
                             out_action = noise_scheduler.step(

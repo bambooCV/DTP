@@ -152,8 +152,8 @@ class LMDBDataset(Dataset):
         self.sequence_length = sequence_length
         self.chunk_size = chunk_size
         self.action_dim = action_dim
-        self.dummy_rgb_camera_top_padding = torch.zeros(sequence_length, 3, ORIGINAL_STATIC_RES_W, ORIGINAL_STATIC_RES_W, dtype=torch.uint8)
-        self.dummy_top_actions = torch.zeros(sequence_length, chunk_size, action_dim)
+        self.dummy_rgb_camera_padding = torch.zeros(sequence_length, 3, ORIGINAL_STATIC_RES_W, ORIGINAL_STATIC_RES_W, dtype=torch.uint8)
+        self.dummy_actions = torch.zeros(sequence_length, chunk_size, action_dim)
         self.dummy_mask = torch.zeros(sequence_length)
         self.lmdb_dir = lmdb_dir
 
@@ -174,8 +174,8 @@ class LMDBDataset(Dataset):
 
         idx = idx + self.start_step
 
-        rgb_camera_top = self.dummy_rgb_camera_top_padding.clone()
-        top_actions = self.dummy_top_actions.clone()
+        rgb_camera = self.dummy_rgb_camera_padding.clone()
+        actions = self.dummy_actions.clone()
         mask = self.dummy_mask.clone()
 
         cur_episode = loads(self.txn.get(f'cur_episode_{idx}'.encode()))
@@ -186,64 +186,63 @@ class LMDBDataset(Dataset):
             new_idx = idx + i
             if loads(self.txn.get(f'cur_episode_{new_idx}'.encode())) == cur_episode:
                 mask[i] = 1
-                get_rgb_camera_top = decode_jpeg(loads(self.txn.get(f'rgb_camera_top_{new_idx}'.encode())))
-                get_rgb_camera_top = F.interpolate(get_rgb_camera_top.unsqueeze(0), size=(ORIGINAL_STATIC_RES_H, ORIGINAL_STATIC_RES_W), mode='bilinear', align_corners=False).squeeze(0)
-                rgb_camera_top[i] = F.pad(
-                                            get_rgb_camera_top,
+                get_rgb_camera = decode_jpeg(loads(self.txn.get(f'rgb_camera_left_{new_idx}'.encode())))
+                get_rgb_camera = F.interpolate(get_rgb_camera.unsqueeze(0), size=(ORIGINAL_STATIC_RES_H, ORIGINAL_STATIC_RES_W), mode='bilinear', align_corners=False).squeeze(0)
+                rgb_camera[i] = F.pad(
+                                            get_rgb_camera,
                                             pad=(0, 0, 80, 80),  # 在高度方向填充
                                             mode='replicate'  # 使用边缘像素填充
                                         )
-                traj_2d_top = loads(self.txn.get(f'traj_2d_top_{new_idx}'.encode()))
-                if len(traj_2d_top) < self.chunk_size:
+                traj_2d = loads(self.txn.get(f'traj_2d_left_{new_idx}'.encode()))
+                if len(traj_2d) < self.chunk_size:
                     mask[i] = 0  
                     # vis
-                    # traj_2d_top_trans = traj_2d_top * torch.tensor([0.5, 0.667])  + torch.tensor([0, 80]) # 坐标转换
-                    # rgb_vis = rgb_camera_top[i].permute(1, 2, 0).numpy().copy()
-                    # for (u, v) in traj_2d_top_trans:
+                    # traj_2d_trans = traj_2d * torch.tensor([0.5, 0.667])  + torch.tensor([0, 80]) # 坐标转换
+                    # rgb_vis = rgb_camera[i].permute(1, 2, 0).numpy().copy()
+                    # for (u, v) in traj_2d_trans:
                     #     cv2.circle(rgb_vis, (int(u), int(v)), radius=5, color=(0, 255, 0), thickness=-1) 
                     # cv2.imwrite("tools/visualization/train_rgb_vis.png", rgb_vis)  
-                    # print(len(traj_2d_top))
+                    # print(len(traj_2d))
                     # print('test')
                 else: 
-                    traj_2d_top_trans = traj_2d_top * torch.tensor([0.5, 0.667])  + torch.tensor([0, 80]) # 坐标转换
-                    top_actions[i,:,:] = resample_sequence_adapter(traj_2d_top_trans, self.chunk_size) # 坐标下采样
+                    traj_2d_trans = traj_2d + torch.tensor([0, 80]) # 坐标转换
+                    actions[i,:,:] = resample_sequence_adapter(traj_2d_trans, self.chunk_size) # 坐标下采样
                     rand_value = random.random()
                     if rand_value < 0.5:
                         # 随机亮度、对比度、饱和度调整
                         # enhancer = transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2)
-                        # rgb_camera_top[i] = enhancer(rgb_camera_top[i])
+                        # rgb_camera[i] = enhancer(rgb_camera[i])
                         pass
                     else:
-                        rgb_camera_top[i] = transforms.functional.hflip(rgb_camera_top[i])
-                        top_actions[i][:, 0] = rgb_camera_top[i].shape[-1] - top_actions[i][:, 0]
+                        rgb_camera[i] = transforms.functional.hflip(rgb_camera[i])
+                        actions[i][:, 0] = rgb_camera[i].shape[-1] - actions[i][:, 0]
                     # elif rand_value < 0.5:
                     #     # 水平翻转
-                    #     rgb_camera_top[i] = transforms.functional.hflip(rgb_camera_top[i])
-                    #     top_actions[i][:, 0] = rgb_camera_top[i].shape[-1] - top_actions[i][:, 0]
+                    #     rgb_camera[i] = transforms.functional.hflip(rgb_camera[i])
+                    #     actions[i][:, 0] = rgb_camera[i].shape[-1] - actions[i][:, 0]
                     # elif rand_value < 0.75:
                     #     # 垂直翻转
-                    #     rgb_camera_top[i] = transforms.functional.vflip(rgb_camera_top[i])
-                    #     top_actions[i][:, 1] = rgb_camera_top[i].shape[-2] - top_actions[i][:, 1]
+                    #     rgb_camera[i] = transforms.functional.vflip(rgb_camera[i])
+                    #     actions[i][:, 1] = rgb_camera[i].shape[-2] - actions[i][:, 1]
                     # else:
                     #     # 同时水平和垂直翻转
-                    #     rgb_camera_top[i] = transforms.functional.hflip(rgb_camera_top[i])
-                    #     rgb_camera_top[i] = transforms.functional.vflip(rgb_camera_top[i])
-                    #     top_actions[i][:, 0] = rgb_camera_top[i].shape[-1] - top_actions[i][:, 0]
-                    #     top_actions[i][:, 1] = rgb_camera_top[i].shape[-2] - top_actions[i][:, 1]
+                    #     rgb_camera[i] = transforms.functional.hflip(rgb_camera[i])
+                    #     rgb_camera[i] = transforms.functional.vflip(rgb_camera[i])
+                    #     actions[i][:, 1] = rgb_camera[i].shape[-2] - actions[i][:, 1]
                     # vis
-                    # rgb_vis = rgb_camera_top[i].permute(1, 2, 0).numpy().copy()
-                    # for (u, v) in top_actions[i]:
+                    # rgb_vis = rgb_camera[i].permute(1, 2, 0).numpy().copy()
+                    # for (u, v) in actions[i]:
                     #     cv2.circle(rgb_vis, (int(u), int(v)), radius=5, color=(0, 255, 0), thickness=-1) 
-                    # cv2.imwrite("tools/visualization/train_rgb_vis.png", rgb_vis)  
+                    # cv2.imwrite("visualization/train_rgb_vis.png", rgb_vis)  
                     # print(inst)
                     # print('test')
 
         return {
-            'rgb_camera_top': rgb_camera_top,
+            'rgb_camera': rgb_camera,
             'inst':inst,
             'inst_token': inst_token,
             'inst_emb': inst_emb,
-            'top_actions': top_actions,
+            'actions': actions,
             'mask': mask,
         }
 
@@ -264,7 +263,7 @@ if __name__ == '__main__':
     )
 
     train_dataset = LMDBDataset(
-        lmdb_dir = "/media/users/bamboo/dataset/lmdb/evaluation_1/",
+        lmdb_dir = "/media/users/bamboo/dataset/lmdb/ral_rebuttal_2/",
         sequence_length = 1, 
         chunk_size = 30,# 最长不超过65
         action_dim = 2, # x,y,gripper_state
@@ -272,7 +271,7 @@ if __name__ == '__main__':
         end_ratio = 0.95, 
     )
     val_dataset = LMDBDataset(
-        lmdb_dir = "/media/users/bamboo/dataset/lmdb/evaluation_1/",
+        lmdb_dir = "/media/users/bamboo/dataset/lmdb/ral_rebuttal_2/",   
         sequence_length = 1, 
         chunk_size = 30,# 最长不超过65
         action_dim = 2,
@@ -306,26 +305,26 @@ if __name__ == '__main__':
             batch, load_time = train_prefetcher.next()
             while batch is not None:
                 batch, load_time = train_prefetcher.next()
-                image = batch['rgb_camera_top']
-                naction = batch['top_actions']
-                rgb_top_norm,naction_transformed = preprocessor.rgb_process(batch['rgb_camera_top'],batch['top_actions'],train=True)
+                image = batch['rgb_camera']
+                naction = batch['actions']
+                rgb_norm,naction_transformed = preprocessor.rgb_process(batch['rgb_camera'],batch['actions'],train=True)
                 # visualization croped image
                 # Convert tensor to NumPy array for visualization
                 import cv2
                 for batch_idx in range(image.shape[0]):
                     for seq_idx in range(image.shape[1]):
-                        rgb_camera_top = image[batch_idx][seq_idx].permute(1, 2, 0).cpu().numpy().copy()
+                        rgb_camera = image[batch_idx][seq_idx].permute(1, 2, 0).cpu().numpy().copy()
                         for point_2d in naction[batch_idx,seq_idx,:,:]:
-                            cv2.circle(rgb_camera_top, tuple(point_2d.int().tolist()), radius=3, color=(0, 0, 255), thickness=-1)
-                        cv2.putText(rgb_camera_top, batch["inst"][batch_idx], (10, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.30, (0, 0, 0), 1)
-                        cv2.imwrite("tools/visualization/rgb_camera_top_groundtruth.png", rgb_camera_top)  
+                            cv2.circle(rgb_camera, tuple(point_2d.int().tolist()), radius=3, color=(0, 0, 255), thickness=-1)
+                        cv2.putText(rgb_camera, batch["inst"][batch_idx], (10, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.30, (0, 0, 0), 1)
+                        cv2.imwrite("visualization/rgb_camera_groundtruth.png", rgb_camera)  
 
-                        rgb_top_reshape = preprocessor.rgb_recovery(rgb_top_norm)
-                        rgb_top_np = rgb_top_reshape[batch_idx][seq_idx].permute(1, 2, 0).cpu().numpy().copy()
+                        rgb_reshape = preprocessor.rgb_recovery(rgb_norm)
+                        rgb_np = rgb_reshape[batch_idx][seq_idx].permute(1, 2, 0).cpu().numpy().copy()
 
                         for point_2d in naction_transformed[batch_idx,seq_idx,:,:]:
-                            cv2.circle(rgb_top_np, tuple(point_2d.int().tolist()), radius=3, color=(0, 0, 255), thickness=-1)
-                        cv2.imwrite("tools/visualization/rgb_camera_top_trans.png", rgb_top_np)  
+                            cv2.circle(rgb_np, tuple(point_2d.int().tolist()), radius=3, color=(0, 0, 255), thickness=-1)
+                        cv2.imwrite("visualization/rgb_camera_trans.png", rgb_np)  
                         cv2.waitKey(10)
                 pbar.update(1) 
 
