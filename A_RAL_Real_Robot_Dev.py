@@ -33,8 +33,6 @@ class JointInference:
         }
         self.current_task = "open the upper drawer"  # 默认任务
         
-        # 创建一个控制窗口
-        cv2.namedWindow('Task Control')
 
 
     def prepare(self):
