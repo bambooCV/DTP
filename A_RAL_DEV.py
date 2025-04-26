@@ -98,21 +98,18 @@ class DTP_Evaluation():
         self.step = 0
         self.all_time_actions = torch.zeros([self.max_publish_step, self.max_publish_step + self.chunk_size, self.state_dim]).to(self.device)
 
-    def inference(self,obs):
+    def infer(self,obs):
         # Language
-        text = " pick up the bread and put it on the plate"
+        text = "open the upper drawer"
         tokenized_text = self.tokenizer(text)
 
         # get images
         all_cam_images =[]
-        for cam_name in ['left', 'wrist', 'top']:
+        for cam_name in ['left', 'wrist', 'front']:
 
             cam_img = obs['images'][cam_name]
             cam_img = cv2.imdecode(cam_img, cv2.IMREAD_COLOR)
-
-            if cam_name == 'top':
-                cam_img = cv2.resize(cam_img, dsize=(640,480))  # (480, 640, 3)
-            
+     
             padding_value = (640 - 480) // 2  # 假设宽度大于高度
             cam_img = cv2.copyMakeBorder(
                 cam_img,
@@ -132,9 +129,9 @@ class DTP_Evaluation():
         self.rgb_top_list.append(rgb_top)
 
         # State
-        arm_state = obs['qpos'][:7]
+        arm_state = obs['arm_joints']['single'][:7]
         # arm_state = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        gripper_state = 0 if obs['qpos'][-1] < 0.2 else 1
+        gripper_state = 0 if obs['arm_joints']['single'][-1] < 0.2 else 1
         state = torch.from_numpy(np.hstack([arm_state, gripper_state]))
         self.state_list.append(state)
 
