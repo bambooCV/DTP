@@ -98,9 +98,8 @@ class DTP_Evaluation():
         self.step = 0
         self.all_time_actions = torch.zeros([self.max_publish_step, self.max_publish_step + self.chunk_size, self.state_dim]).to(self.device)
 
-    def infer(self,obs):
+    def infer(self,obs,task_name='open the upper drawer'):
         # Language
-        text = "open the upper drawer"
         tokenized_text = self.tokenizer(text)
 
         # get images

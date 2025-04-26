@@ -38,7 +38,8 @@ class JointInference:
     def inference(self):
         obs = self.robot_station.get_obs()
         while True:
-            action_pred: np.ndarray = self.infer_model.infer(obs)
+            task_name = "open the upper drawer"'
+            action_pred: np.ndarray = self.infer_model.infer(obs,task_name)
             action_pred = action_pred.cpu().numpy()
             print(action_pred)
             robot_targets = self.robot_station.decompose_action(action_pred)
