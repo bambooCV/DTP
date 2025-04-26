@@ -5,7 +5,7 @@ from xrocs.common.data_type import Joints
 from xrocs.core.config_loader import ConfigLoader
 from xrocs.utils.logger.logger_loader import logger
 from xrocs.core.station_loader import StationLoader
-
+import cv2
 # 导入模型class
 # from delpoyment.inference_frank_neil_diffusion_test import DiffusionPolicyInference
 from A_RAL_DEV import DTP_Evaluation
@@ -24,6 +24,18 @@ class JointInference:
         print('inference model loading')
         self.infer_model = DTP_Evaluation(model_cfg)
         self.infer_model.reset()
+        # 监听
+                # 添加任务映射字典
+        self.task_mapping = {
+            ord('1'): "open the upper drawer",
+            ord('2'): "pick bread and place into drawer",
+            ord('3'): "close the upper drawer",
+        }
+        self.current_task = "open the upper drawer"  # 默认任务
+        
+        # 创建一个控制窗口
+        cv2.namedWindow('Task Control')
+
 
     def prepare(self):
         for name, _robot in self.robot_station.get_robot_handle().items():
@@ -37,11 +49,17 @@ class JointInference:
 
     def inference(self):
         obs = self.robot_station.get_obs()
+
         while True:
-            task_name = "open the upper drawer"'
-            action_pred: np.ndarray = self.infer_model.infer(obs,task_name)
+            cv2.imshow("rgb_vis", cv2.imdecode(obs['images']['left'], cv2.IMREAD_COLOR))
+            print(f"\rCurrent task: {self.current_task}", end="")
+            key = cv2.waitKey(1) & 0xFF
+            if key in self.task_mapping:
+                self.current_task = self.task_mapping[key]
+                self.infer_model.reset()
+                print(f"\nSwitched to task: {self.current_task}")
+            action_pred: np.ndarray = self.infer_model.infer(obs,self.current_task)
             action_pred = action_pred.cpu().numpy()
-            print(action_pred)
             robot_targets = self.robot_station.decompose_action(action_pred)
             obs = self.robot_station.step(robot_targets)
 

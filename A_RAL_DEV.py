@@ -100,7 +100,7 @@ class DTP_Evaluation():
 
     def infer(self,obs,task_name='open the upper drawer'):
         # Language
-        tokenized_text = self.tokenizer(text)
+        tokenized_text = self.tokenizer(task_name)
 
         # get images
         all_cam_images =[]
