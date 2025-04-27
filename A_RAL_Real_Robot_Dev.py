@@ -19,7 +19,8 @@ class JointInference:
         station_loader = StationLoader(self.cfg_dict)
         self.robot_station = station_loader.generate_station_handle()
         self.robot_station.connect()
-        model_cfg = json.load(open('/home/ps/Dev/bamboo/Pretrain_Model/ral_rebuttal/RAL_GR1_0424/config_dev.json'))
+        # model_cfg = json.load(open('/home/ps/Dev/bamboo/Pretrain_Model/ral_rebuttal/RAL_GR1_0424/config_dev.json'))
+        model_cfg = json.load(open('/home/ps/Dev/bamboo/Pretrain_Model/ral_rebuttal/RAL_DTP_0424/config_dev.json'))
     
         print('inference model loading')
         self.infer_model = DTP_Evaluation(model_cfg)
@@ -30,6 +31,8 @@ class JointInference:
             ord('1'): "open the upper drawer",
             ord('2'): "pick bread and place into drawer",
             ord('3'): "close the upper drawer",
+            ord('4'): "open the upper drawer",
+            ord('5'): "close the upper drawer",
         }
         self.current_task = "open the upper drawer"  # 默认任务
         
