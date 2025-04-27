@@ -19,7 +19,7 @@ class JointInference:
         station_loader = StationLoader(self.cfg_dict)
         self.robot_station = station_loader.generate_station_handle()
         self.robot_station.connect()
-        model_cfg = json.load(open('/home/ps/Dev/bamboo/Pretrain_Model/ral_rebuttal/RAL_DTP_0424/config_dev.json'))
+        model_cfg = json.load(open('/home/ps/Dev/bamboo/Pretrain_Model/ral_rebuttal/RAL_GR1_0424/config_dev.json'))
     
         print('inference model loading')
         self.infer_model = DTP_Evaluation(model_cfg)
@@ -56,7 +56,15 @@ class JointInference:
                 self.current_task = self.task_mapping[key]
                 self.infer_model.reset()
                 print(f"\nSwitched to task: {self.current_task}")
-            action_pred: np.ndarray = self.infer_model.infer(obs,self.current_task)
+            elif key == ord('r'): # restart
+                self.infer_model.reset()
+                self.prepare()
+                obs = self.robot_station.get_obs()
+                self.current_task = "open the upper drawer"
+
+            # elif key = ord('s') # stop
+
+            action_pred: np.ndarray = self.infer_model.infer(obs,self.current_task,key)
             action_pred = action_pred.cpu().numpy()
             robot_targets = self.robot_station.decompose_action(action_pred)
             obs = self.robot_station.step(robot_targets)

@@ -25,7 +25,7 @@ def contains_words(inst, include_words=[], exclude_words=[]):
     return True
 def add_noise(sequence, noise_level=2.0):
     noise = torch.randn(sequence.shape) * noise_level
-    noisy_sequence = sequence + noise
+    noisy_sequence = sequence + noise.to(sequence.device)
     return noisy_sequence
 def resample_sequence(sequence, target_length):
     """
@@ -45,7 +45,7 @@ def resample_sequence(sequence, target_length):
     
     return resampled_sequence
 
-def resample_sequence_adapter(sequence, target_length):
+def resample_sequence_adapter(sequence, target_length, noise_flag=True):
     """
     使用自适应插值将 sequence 重新采样到 target_length，并将结果四舍五入为整数。
     稀疏区域分配更多采样点，密集区域分配更少采样点。
@@ -59,7 +59,7 @@ def resample_sequence_adapter(sequence, target_length):
 
     # Step 2: 计算点间距离
     distances = torch.norm(sequence[1:] - sequence[:-1], dim=1)  # 相邻点距离
-    distances = torch.cat((torch.tensor([0.0]), distances))  # 插入首点距离为0
+    distances = torch.cat((torch.tensor([0.0]).to(sequence.device), distances))  # 插入首点距离为0
 
     # Step 3: 计算累积分布函数 (CDF)
     cumulative_distances = torch.cumsum(distances.clone(), dim=0)  # 累计距离
@@ -67,7 +67,7 @@ def resample_sequence_adapter(sequence, target_length):
     cumulative_distances = cumulative_distances / cumulative_distances[-1]  # 归一化到 [0, 1]
 
     # Step 4: 生成目标网格点
-    target_positions = torch.linspace(0, 1, target_length)  # 目标均匀分布的点
+    target_positions = torch.linspace(0, 1, target_length).to(sequence.device)  # 目标均匀分布的点
 
     # Step 5: 使用插值计算采样点
     indices = torch.searchsorted(cumulative_distances, target_positions, right=True)
@@ -88,7 +88,8 @@ def resample_sequence_adapter(sequence, target_length):
     )
 
     # Step 6: 添加噪声（如有需要）
-    resampled_sequence = add_noise(resampled_sequence, noise_level=0.75)
+    if noise_flag:
+        resampled_sequence = add_noise(resampled_sequence, noise_level=0.75)
 
     # Step 7: 将结果四舍五入为整数
     resampled_sequence = torch.round(resampled_sequence).int()

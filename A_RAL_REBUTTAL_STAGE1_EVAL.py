@@ -271,15 +271,15 @@ if __name__ == '__main__':
                         for batch_idx in range(image.shape[0]):
                             for seq_idx in range(image.shape[1]):
                                 rgb_camera = image[batch_idx][seq_idx][:, 80:-80, :].permute(1, 2, 0).cpu().numpy().copy()
-                                for index, point_2d in enumerate(naction[batch_idx,seq_idx,:,:] - torch.tensor([0, 80]).to(device)):
-                                    color = (
-                                        int(255 * (index / naction.shape[2])),  # 红色分量
-                                        int(206 * (index / naction.shape[2])),  # 绿色分量
-                                        int(135 * (index / naction.shape[2]))   # 蓝色分量
-                                    )
-                                    cv2.circle(rgb_camera, tuple(point_2d.int().tolist()), radius=8, color=(255, 255, 255), thickness=-1)
-                                    cv2.circle(rgb_camera, tuple(point_2d.int().tolist()), radius=6, color=color, thickness=-1)
-                                cv2.putText(rgb_camera, batch["inst"][batch_idx], (10, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.30, (0, 0, 0), 1)
+                                # for index, point_2d in enumerate(naction[batch_idx,seq_idx,:,:] - torch.tensor([0, 80]).to(device)):
+                                #     color = (
+                                #         int(255 * (index / naction.shape[2])),  # 红色分量
+                                #         int(206 * (index / naction.shape[2])),  # 绿色分量
+                                #         int(135 * (index / naction.shape[2]))   # 蓝色分量
+                                #     )
+                                #     cv2.circle(rgb_camera, tuple(point_2d.int().tolist()), radius=8, color=(255, 255, 255), thickness=-1)
+                                #     cv2.circle(rgb_camera, tuple(point_2d.int().tolist()), radius=6, color=color, thickness=-1)
+                                # cv2.putText(rgb_camera, batch["inst"][batch_idx], (10, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.30, (0, 0, 0), 1)
                                 cv2.imwrite(f"visualization/rgb_camera_groundtruth{val_index}_{batch_idx}.png", rgb_camera)  
                                 
                                 rgb_camera = image[batch_idx][seq_idx][:, 80:-80, :].permute(1, 2, 0).cpu().numpy().copy()
