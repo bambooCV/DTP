@@ -176,7 +176,7 @@ class DTP_Evaluation():
         if self.use_2d_traj:
             # 2d traj 
             self.policy_traj = TrajPredictPolicy()
-            traj_model_path = "/home/ps/Dev/bamboo/inrocs_online_inference/diffusion-trajectory-guided-policy/Save/Real_Robot_2D_pick_bread_total.pth"
+            traj_model_path = "/home/ps/Dev/bamboo/Pretrain_Model/ral_rebuttal/RAL_Rebuttal_stage1.pth"
             traj_state_dict = torch.load(traj_model_path,map_location=self.device)['model_state_dict']
             new_state_dict = {}
             for key, value in traj_state_dict.items():
@@ -316,14 +316,14 @@ class DTP_Evaluation():
                 print("Diffusion trajectory generation")
                 with torch.no_grad():
                     self.noise_scheduler.set_timesteps(self.num_diffusion_iters)
-                    rgb_top_norm = rgb_top_data[:,len(self.rgb_top_list)-1].unsqueeze(0)
+                    rgb_norm = rgb_left_data[:,len(self.rgb_left_list)-1].unsqueeze(0)
                     noisy_action = torch.randn([1,30,2], device=self.device)
                     out_action = noisy_action
                     language_embedding, obs_embeddings, patch_embeddings = None, None, None
 
                     for k in self.noise_scheduler.timesteps:
                             # predict noise
-                            noise_pred, language_embedding, obs_embeddings, patch_embeddings = self.policy_traj(rgb_top_norm, tokenized_text, timesteps=k, noisy_actions=out_action,
+                            noise_pred, language_embedding, obs_embeddings, patch_embeddings = self.policy_traj(rgb_norm, tokenized_text, timesteps=k, noisy_actions=out_action,
                                                 language_embedding=language_embedding, obs_embeddings=obs_embeddings, patch_embeddings=patch_embeddings)
                             # inverse diffusion step (remove noise)
                             out_action = self.noise_scheduler.step(
@@ -336,19 +336,20 @@ class DTP_Evaluation():
                     for _ in range(10):
                         self.traj_2d_list.append(re_out_action.squeeze(0)) 
                     self.diff_flag = False
-                # rgb_vis = rgb_top.permute(1, 2, 0).numpy().copy()
-                # re_out_action_ori = resize_points(re_out_action.clone(), (224,224), (640,640))
-                # re_out_action_ori = re_out_action_ori.squeeze(0).squeeze(0)
-                # for index, point_2d in enumerate(re_out_action_ori):
-                #     color = (
-                #         int(255 * (index / 30)),  # 红色分量
-                #         int(206 * (index / 30)),  # 绿色分量
-                #         int(135 * (index / 30))   # 蓝色分量
-                #     )
-                #     cv2.circle(rgb_vis, tuple(point_2d.int().tolist()), radius=8, color=(255, 255, 255), thickness=-1)
-                #     cv2.circle(rgb_vis, tuple(point_2d.int().tolist()), radius=6, color=color, thickness=-1)
+                # visualization
+                rgb_vis = rgb_left.permute(1, 2, 0).numpy().copy()
+                re_out_action_ori = resize_points(re_out_action.clone(), (224,224), (640,640))
+                re_out_action_ori = re_out_action_ori.squeeze(0).squeeze(0)
+                for index, point_2d in enumerate(re_out_action_ori):
+                    color = (
+                        int(255 * (index / 30)),  # 红色分量
+                        int(206 * (index / 30)),  # 绿色分量
+                        int(135 * (index / 30))   # 蓝色分量
+                    )
+                    cv2.circle(rgb_vis, tuple(point_2d.int().tolist()), radius=8, color=(255, 255, 255), thickness=-1)
+                    cv2.circle(rgb_vis, tuple(point_2d.int().tolist()), radius=6, color=color, thickness=-1)
                 
-                # cv2.imwrite(f"traj_predict/script/visualization/image_inference_{self.rollout_step_counter}.png", rgb_vis)  
+                cv2.imwrite(f"visualization/stage_1_{self.rollout_step_counter}.png", rgb_vis)  
             self.rollout_step_counter += 1
             re_out_action = self.traj_2d_list[-1]
             traj_2d = torch.zeros((1, self.seq_len, 30, 2))
@@ -484,29 +485,29 @@ class DTP_Evaluation():
                     action_pred[:7] = action_pred[:7]*self.stats['delta_joint_std'][:7] + self.stats['delta_joint_mean'][:7]
                 action_pred[:7] = action_pred[:7] + arm_state
         # visualize 2d traj
-        # rgb_vis = rgb_top.permute(1, 2, 0).numpy().copy()
-        # if self.use_2d_traj:
-        #     point_2d_pred = prediction['traj_2d_preds'][0][-1] * 640
-        #     re_out_action_ori = resize_points(re_out_action.clone(), (224,224), (640,640))
-        #     re_out_action_ori = re_out_action_ori.squeeze(0).squeeze(0)
-        #     for index, point_2d in enumerate(re_out_action_ori):
-        #         color = (
-        #             int(255 * (index / 30)),  # 红色分量
-        #             int(206 * (index / 30)),  # 绿色分量
-        #             int(135 * (index / 30))   # 蓝色分量
-        #         )
-        #         cv2.circle(rgb_vis, tuple(point_2d.int().tolist()), radius=8, color=(255, 255, 255), thickness=-1)
-        #         cv2.circle(rgb_vis, tuple(point_2d.int().tolist()), radius=6, color=color, thickness=-1)
-        #     # 2d traj 5 points prediction
-        #     for point_2d in point_2d_pred :
-        #         cv2.circle(rgb_vis, tuple(point_2d.int().tolist()), radius=3, color=(255, 0, 0), thickness=-1)
-        #     # 检测按键输入
-        #     key = cv2.waitKey(1) & 0xFF  # 等待键盘输入
+        rgb_vis = rgb_left.permute(1, 2, 0).numpy().copy()
+        if self.use_2d_traj:
+            point_2d_pred = prediction['traj_2d_preds'][0][-1] * 640
+            re_out_action_ori = resize_points(re_out_action.clone(), (224,224), (640,640))
+            re_out_action_ori = re_out_action_ori.squeeze(0).squeeze(0)
+            for index, point_2d in enumerate(re_out_action_ori):
+                color = (
+                    int(255 * (index / 30)),  # 红色分量
+                    int(206 * (index / 30)),  # 绿色分量
+                    int(135 * (index / 30))   # 蓝色分量
+                )
+                cv2.circle(rgb_vis, tuple(point_2d.int().tolist()), radius=8, color=(255, 255, 255), thickness=-1)
+                cv2.circle(rgb_vis, tuple(point_2d.int().tolist()), radius=6, color=color, thickness=-1)
+            # 2d traj 5 points prediction
+            for point_2d in point_2d_pred :
+                cv2.circle(rgb_vis, tuple(point_2d.int().tolist()), radius=3, color=(255, 0, 0), thickness=-1)
+            # 检测按键输入
+            # key = cv2.waitKey(1) & 0xFF  # 等待键盘输入
 
-        #     if key == ord('d'):  # 如果按下 'd'
-        #         self.diff_flag = True
-        #         print("Key 'd' pressed, diff_flag set to:", self.diff_flag)
-        # cv2.imshow("image_inference", rgb_vis)
+            # if key == ord('d'):  # 如果按下 'd'
+            #     self.diff_flag = True
+            #     print("Key 'd' pressed, diff_flag set to:", self.diff_flag)
+        cv2.imshow("image_inference", rgb_vis)
         # cv2.waitKey(1)
 
         return action_pred

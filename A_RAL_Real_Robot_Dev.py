@@ -7,8 +7,8 @@ from xrocs.utils.logger.logger_loader import logger
 from xrocs.core.station_loader import StationLoader
 import cv2
 # 导入模型class
-# from delpoyment.inference_frank_neil_diffusion_test import DiffusionPolicyInference
-from A_RAL_DEV import DTP_Evaluation
+# from A_RAL_DEV import DTP_Evaluation
+from A_RAL_GR1_DTP_DEV import DTP_Evaluation
 
 class JointInference:
     def __init__(self, config_path = None, model_path = None):
@@ -19,7 +19,7 @@ class JointInference:
         station_loader = StationLoader(self.cfg_dict)
         self.robot_station = station_loader.generate_station_handle()
         self.robot_station.connect()
-        model_cfg = json.load(open('/home/ps/Dev/bamboo/Pretrain_Model/ral_rebuttal/RAL_GR1_0424/config_dev.json'))
+        model_cfg = json.load(open('/home/ps/Dev/bamboo/Pretrain_Model/ral_rebuttal/RAL_DTP_0424/config_dev.json'))
     
         print('inference model loading')
         self.infer_model = DTP_Evaluation(model_cfg)
