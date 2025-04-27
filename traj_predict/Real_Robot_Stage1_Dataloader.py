@@ -187,6 +187,12 @@ class LMDBDataset(Dataset):
             if loads(self.txn.get(f'cur_episode_{new_idx}'.encode())) == cur_episode:
                 mask[i] = 1
                 get_rgb_camera = decode_jpeg(loads(self.txn.get(f'rgb_camera_left_{new_idx}'.encode())))
+                actual_height, actual_width = get_rgb_camera.shape[-2:]  # 获取实际图像尺寸
+
+                if actual_height != ORIGINAL_STATIC_RES_H or actual_width != ORIGINAL_STATIC_RES_W:
+                    print(f"Warning: Unexpected image size! Expected {ORIGINAL_STATIC_RES_W}x{ORIGINAL_STATIC_RES_H}, "
+                        f"but got {actual_width}x{actual_height} for rgb_camera_left_{new_idx}")
+
                 get_rgb_camera = F.interpolate(get_rgb_camera.unsqueeze(0), size=(ORIGINAL_STATIC_RES_H, ORIGINAL_STATIC_RES_W), mode='bilinear', align_corners=False).squeeze(0)
                 rgb_camera[i] = F.pad(
                                             get_rgb_camera,

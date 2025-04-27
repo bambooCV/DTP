@@ -165,7 +165,7 @@ if __name__ == '__main__':
         batch_size=batch_size, # to be flattened in prefetcher  
         num_workers=num_workers,
         pin_memory=True, # Accelerate data reading
-        shuffle=True,
+        shuffle=False,
         prefetch_factor=2,
         persistent_workers=True,
     ) 
@@ -174,7 +174,7 @@ if __name__ == '__main__':
              
     model = TrajPredictPolicy()
     # 预训练模型读入
-    model_path = "Save/RAL_Rebuttal_stage1.pth"
+    model_path = "Save/RAL_Rebuttal_stage1_0427.pth"
     state_dict = torch.load(model_path,map_location=device)['model_state_dict']
     new_state_dict = {}
     for key, value in state_dict.items():
@@ -214,7 +214,7 @@ if __name__ == '__main__':
                         image = batch['rgb_camera']
                         naction = batch['actions']
                         # example inputs
-                        rgb_top_norm,naction_transformed = preprocessor.rgb_process(batch['rgb_camera'],batch['actions'],train=False)    
+                        rgb_norm,naction_transformed = preprocessor.rgb_process(batch['rgb_camera'],batch['actions'],train=False)    
                         naction_trans_norm = normalize_data(naction_transformed)
                         noisy_action = torch.randn(naction.shape, device=device)
                         batch_val_size,sequence,chunk_size,dim = noisy_action.shape
@@ -228,7 +228,7 @@ if __name__ == '__main__':
 
                         for k in noise_scheduler.timesteps:
                             # predict noise
-                            noise_pred, language_embedding, obs_embeddings, patch_embeddings = model(rgb_top_norm, language, timesteps=k, noisy_actions=out_action,
+                            noise_pred, language_embedding, obs_embeddings, patch_embeddings = model(rgb_norm, language, timesteps=k, noisy_actions=out_action,
                                                 language_embedding=language_embedding, obs_embeddings=obs_embeddings, patch_embeddings=patch_embeddings)
                             # inverse diffusion step (remove noise)
                             out_action = noise_scheduler.step(
@@ -244,6 +244,20 @@ if __name__ == '__main__':
 
                         
                         re_out_action = unnormalize_data(out_action)
+                        # import cv2
+                        # rgb_reshape = preprocessor.rgb_recovery(rgb_norm)
+
+                        # rgb_np = rgb_reshape[0][0].permute(1, 2, 0).cpu().numpy().copy()
+                        # for point_2d in naction_transformed[0,0,:,:]:
+                        #     cv2.circle(rgb_np, tuple(point_2d.int().tolist()), radius=3, color=(0, 0, 255), thickness=-1)
+                        # cv2.imwrite("visualization/rgb_camera_trans_groundtruth.png", rgb_np)  
+
+                        # rgb_np = rgb_reshape[0][0].permute(1, 2, 0).cpu().numpy().copy()
+                        # for point_2d in re_out_action[0,:,:]:
+                        #     cv2.circle(rgb_np, tuple(point_2d.int().tolist()), radius=3, color=(0, 0, 255), thickness=-1)
+                        # cv2.imwrite("visualization/rgb_camera_trans_pred.png", rgb_np)  
+
+
                         val_sample_loss =nn.functional.mse_loss(out_action, naction_trans_norm.squeeze(1))
                         val_total_loss += val_sample_loss.item()
                         # print(val_sample_loss.item())
@@ -251,7 +265,7 @@ if __name__ == '__main__':
                         # ################Convert tensor to NumPy array for visualization
                         re_out_action = re_out_action.unsqueeze(1)
                         re_out_action_ori = resize_points(re_out_action.clone(), (224,224), (640,640))
-                        # re_out_action_ori = (re_out_action - torch.tensor([0, 80]).to(device))/torch.tensor([0.5, 0.667]).to(device)
+                    
                 
                         import cv2
                         for batch_idx in range(image.shape[0]):
@@ -277,7 +291,7 @@ if __name__ == '__main__':
                                     )
                                     cv2.circle(rgb_camera, tuple(point_2d.int().tolist()), radius=8, color=(255, 255, 255), thickness=-1)
                                     cv2.circle(rgb_camera, tuple(point_2d.int().tolist()), radius=6, color=color, thickness=-1)
-                                    # cv2.circle(rgb_camera_top, tuple(point_2d.int().tolist()), radius=3, color=(0, 0, 255), thickness=-1)
+                                    # cv2.circle(rgb_camera, tuple(point_2d.int().tolist()), radius=3, color=(0, 0, 255), thickness=-1)
                                 
                                 cv2.imwrite(f"visualization/rgb_camera_groundtruth_pred{val_index}_{batch_idx}.png", rgb_camera)  
 

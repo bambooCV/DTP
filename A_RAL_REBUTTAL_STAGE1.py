@@ -40,7 +40,7 @@ def contains_words(inst, include_words=[], exclude_words=[]):
             return False
     return True
 def save_checkpoint(epoch, model, optimizer,  loss,save_dir="./Save"):
-    save_path = os.path.join(save_dir, f'RAL_Rebuttal_stage1.pth')
+    save_path = os.path.join(save_dir, f'RAL_Rebuttal_stage1_0427.pth')
     
     # 要排除的模块列表
     modules_to_exclude = ['model_mae', 'model_clip']
