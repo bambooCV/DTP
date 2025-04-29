@@ -116,6 +116,16 @@ class TrajPredictPolicy(nn.Module):
 
 class DTP_Evaluation():
     def __init__(self,cfg):
+        # 录像
+        self.record_video = True
+        if self.record_video:
+            self.video_out = None
+            self.fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            self.fps = 30.0
+            self.video_filename = f'inference_output.mp4'
+
+
+
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.preprocessor = Real_Robot_PreProcess(
             cfg['rgb_static_pad'],
@@ -506,7 +516,18 @@ class DTP_Evaluation():
                 cv2.circle(rgb_vis, tuple(point_2d.int().tolist()), radius=3, color=(255, 0, 0), thickness=-1)
             # 检测按键输入
             # key = cv2.waitKey(1) & 0xFF  # 等待键盘输入
-
+            if self.record_video:
+                if self.video_out is None:
+                    height, width = rgb_vis.shape[:2]
+                    self.video_out = cv2.VideoWriter(
+                        self.video_filename,
+                        self.fourcc,
+                        self.fps,
+                        (width, height)
+                    )
+                self.video_out.write(rgb_vis)  
+            if key == ord('q'):
+                self.video_out.release()
             if key == ord('d'):  # 如果按下 'd'
                 self.diff_flag = True
                 print("Key 'd' pressed, diff_flag set to:", self.diff_flag)
